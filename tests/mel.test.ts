@@ -68,3 +68,27 @@ describe("monthly trend", async () => {
     expect(byMonth("paid", [r("2026-01-05", "yes")], ["2026-01", "2026-02"])).toEqual([1, 0]);
   });
 });
+
+describe("regions (counties)", async () => {
+  const { COUNTIES } = await import("../shared/mel");
+  const base = { id: "", kind: "payout", date: "2026-11-02", village: "Enkare", collector: "", note: "", createdAt: "", v: { hh: "A", kes: 1, onTime: "yes", paidTo: "man" } };
+  it("knows all 47 counties and keeps a valid county on a record", () => {
+    expect(COUNTIES).toHaveLength(47);
+    expect(new Set(COUNTIES).size).toBe(47);
+    const c = checkRecord({ ...base, county: "Narok" });
+    expect(c.ok && c.rec.county).toBe("Narok");
+  });
+  it("rejects an unknown county but still accepts older records with none", () => {
+    expect(checkRecord({ ...base, county: "Atlantis" }).ok).toBe(false);
+    const old = checkRecord(base);
+    expect(old.ok && old.rec.county).toBeUndefined();
+  });
+  it("sample data spans several counties and region filtering narrows the numbers", () => {
+    const s = sampleRecords(today);
+    const counties = new Set(s.map((r) => r.county));
+    expect(counties.size).toBeGreaterThanOrEqual(3);
+    const narok = s.filter((r) => r.county === "Narok");
+    expect(metric("paid", narok)).toBeLessThan(metric("paid", s));
+    expect(toCsv(narok).split("\n")[0]).toContain("county");
+  });
+});

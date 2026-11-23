@@ -6,7 +6,9 @@ import { BUCKETS, PRACTICES, regenScore } from "./impact.js";
 /* ---------------- Ground records ---------------- */
 
 export type Kind = "payout" | "household" | "land" | "practice" | "training";
-export type Rec = { id: string; kind: Kind; date: string; village: string; collector: string; note: string; createdAt: string; sample?: boolean; v: Record<string, string | number> };
+export type Rec = { id: string; kind: Kind; date: string; county?: string; village: string; collector: string; note: string; createdAt: string; sample?: boolean; v: Record<string, string | number> };
+// Region = Kenya's 47 counties, in official code order; the level where budgets and policy are decided.
+export const COUNTIES = ["Mombasa", "Kwale", "Kilifi", "Tana River", "Lamu", "Taita-Taveta", "Garissa", "Wajir", "Mandera", "Marsabit", "Isiolo", "Meru", "Tharaka-Nithi", "Embu", "Kitui", "Machakos", "Makueni", "Nyandarua", "Nyeri", "Kirinyaga", "Murang'a", "Kiambu", "Turkana", "West Pokot", "Samburu", "Trans Nzoia", "Uasin Gishu", "Elgeyo-Marakwet", "Nandi", "Baringo", "Laikipia", "Nakuru", "Narok", "Kajiado", "Kericho", "Bomet", "Kakamega", "Vihiga", "Bungoma", "Busia", "Siaya", "Kisumu", "Homa Bay", "Migori", "Kisii", "Nyamira", "Nairobi"];
 export type Field = { key: string; label: T; type: "text" | "number" | "select" | "yesno"; options?: [string, T][]; min?: number; max?: number; required?: boolean; hint?: T };
 
 const yn: [string, T][] = [["yes", o("Ndiyo", "Yes")], ["no", o("Hapana", "No")]];
@@ -74,7 +76,8 @@ export function checkRecord(r: unknown): { ok: true; rec: Rec } | { ok: false; w
   }
   const s = (y: unknown, n: number) => (typeof y === "string" ? y.slice(0, n) : "");
   const id = s(x.id, 40) || `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-  return { ok: true, rec: { id, kind: x.kind, date: x.date, village: s(x.village, 60), collector: s(x.collector, 60), note: s(x.note, 500), createdAt: s(x.createdAt, 30) || new Date().toISOString(), v } };
+  if (x.county != null && x.county !== "" && !COUNTIES.includes(x.county)) return { ok: false, why: "county" };
+  return { ok: true, rec: { id, kind: x.kind, date: x.date, ...(x.county ? { county: x.county } : {}), village: s(x.village, 60), collector: s(x.collector, 60), note: s(x.note, 500), createdAt: s(x.createdAt, 30) || new Date().toISOString(), v } };
 }
 
 // Merge records from another device; same id never counts twice.
@@ -260,10 +263,12 @@ export function applyItems<V extends { id: string; ts?: string }>(local: V[], to
 export function sampleRecords(today = new Date(), seed = 7): Rec[] {
   let x = seed; const rnd = () => ((x = (x * 1103515245 + 12345) % 2147483648) / 2147483648);
   const pickOne = <V,>(a: V[]) => a[Math.floor(rnd() * a.length)];
-  const villages = ["Enkare", "Olkeri", "Naretoi", "Sekenani", "Oloosuyian"];
+  // Fictional villages placed in real counties, so the region filter has something to show.
+  const places: [string, string][] = [["Enkare", "Kajiado"], ["Olkeri", "Kajiado"], ["Naretoi", "Narok"], ["Sekenani", "Narok"], ["Oloosuyian", "Laikipia"], ["Lchoro", "Samburu"]];
+  const villages = places.map(([v]) => v), countyOf = Object.fromEntries(places);
   const out: Rec[] = [];
   const day = (monthsAgo: number) => { const d = new Date(Date.UTC(today.getFullYear(), today.getMonth() - monthsAgo, 1 + Math.floor(rnd() * 27))); return d > today ? today.toISOString().slice(0, 10) : d.toISOString().slice(0, 10); };
-  const add = (kind: Kind, monthsAgo: number, v: Rec["v"]) => out.push({ id: `s${out.length}`, kind, date: day(monthsAgo), village: pickOne(villages), collector: "Sample", note: "", createdAt: "", sample: true, v });
+  const add = (kind: Kind, monthsAgo: number, v: Rec["v"]) => { const village = pickOne(villages); out.push({ id: `s${out.length}`, kind, date: day(monthsAgo), county: countyOf[village], village, collector: "Sample", note: "", createdAt: "", sample: true, v }); };
   for (let m = 11; m >= 0; m--) {
     const t = (11 - m) / 11; // things improve over the year
     if (m % 3 === 0) for (let h = 0; h < 40; h++) add("payout", m, { hh: `HH-${h}`, kes: Math.round(3000 + rnd() * 1500), onTime: rnd() < 0.5 + t * 0.4 ? "yes" : "no", paidTo: rnd() < 0.2 + t * 0.4 ? pickOne(["joint", "woman"]) : "man", channel: rnd() < 0.85 ? "mpesa" : "bank", use: pickOne(BUCKETS.map((b) => b.id)) });
@@ -280,5 +285,5 @@ export function sampleRecords(today = new Date(), seed = 7): Rec[] {
 export function toCsv(recs: Rec[]) {
   const keys = [...new Set(Object.values(KINDS).flatMap((k) => k.fields.map((f) => f.key)))];
   const esc = (s: unknown) => `"${String(s ?? "").replace(/"/g, '""')}"`;
-  return [["id", "kind", "date", "village", "collector", ...keys, "note"].join(","), ...recs.map((r) => [r.id, r.kind, r.date, r.village, r.collector, ...keys.map((k) => r.v[k] ?? ""), r.note].map(esc).join(","))].join("\n");
+  return [["id", "kind", "date", "county", "village", "collector", ...keys, "note"].join(","), ...recs.map((r) => [r.id, r.kind, r.date, r.county ?? "", r.village, r.collector, ...keys.map((k) => r.v[k] ?? ""), r.note].map(esc).join(","))].join("\n");
 }

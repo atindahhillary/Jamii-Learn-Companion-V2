@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { T } from "../shared/content";
 import { BUCKETS, PRACTICES } from "../shared/impact";
 import {
-  AUDIENCE_OPTS, DEFAULT_INDICATORS, KINDS, LEVELS, METRICS, SAMPLE_ISSUES, STAGES, applyItems, breakdown, byMonth, checkRecord, isSampleIssue, kpi, merge, metric, months, people, progress, sampleRecords, smart, stageCounts, toCsv,
+  AUDIENCE_OPTS, COUNTIES, DEFAULT_INDICATORS, KINDS, LEVELS, METRICS, SAMPLE_ISSUES, STAGES, applyItems, breakdown, byMonth, checkRecord, isSampleIssue, kpi, merge, metric, months, people, progress, sampleRecords, smart, stageCounts, toCsv,
   type Field, type Indicator, type Issue, type Item, type Kind, type MetricKey, type Rec,
 } from "../shared/mel";
 import { AreaChart, Bars, Donut } from "./charts";
@@ -165,9 +165,12 @@ export function Dashboard({ open }: { open: (t: string) => void }) {
   const L = useL(), Tx = useT();
   const m = useMel();
   const sync = useSync(m.reload); // the dashboard pulls the team's latest records whenever it is open with signal
-  const villages = [...new Set(m.all.map((r) => r.village).filter(Boolean))].sort();
-  const [village, setVillage] = useState("");
-  const recs = village ? m.all.filter((r) => r.village === village) : m.all;
+  // Region (county) first, then a village inside it. "none" catches older records saved before counties were asked.
+  const [region, setRegion] = useState(""), [village, setVillage] = useState("");
+  const regions = [...new Set(m.all.map((r) => r.county ?? "none"))].sort((a, b) => (a === "none" ? 1 : b === "none" ? -1 : a.localeCompare(b)));
+  const inRegion = region ? m.all.filter((r) => (r.county ?? "none") === region) : m.all;
+  const villages = [...new Set(inRegion.map((r) => r.village).filter(Boolean))].sort();
+  const recs = village ? inRegion.filter((r) => r.village === village) : inRegion;
   const ms = months();
   const k = Object.fromEntries(KPI_CARDS.map(([key]) => [key, kpi(key, recs, m.issues)])) as Record<MetricKey, ReturnType<typeof kpi>>;
   const use = breakdown(recs, "payout", "use");
@@ -183,6 +186,7 @@ export function Dashboard({ open }: { open: (t: string) => void }) {
   if (!m.all.length) return <section className="card stack"><h2>{L("Bado hakuna data", "No data yet")}</h2><p>{L("Anza kukusanya data ya ardhini, au washa data ya mfano kuona dashibodi inavyofanya kazi.", "Start collecting ground data, or turn on sample data to see how the dashboard works.")}</p><div className="row"><button className="btn" onClick={() => open("collect")}><Plus size={16} aria-hidden /> {L("Kusanya data", "Collect data")}</button><button className="btn ghost" onClick={() => m.setShowSample(true)}>{L("Onyesha data ya mfano", "Show sample data")}</button></div></section>;
   return <div className="stack dash">
     <div className="dash-bar">
+      <label className="inline">{L("Kaunti", "Region (county)")} <select value={region} onChange={(e) => { setRegion(e.target.value); setVillage(""); }}><option value="">{L("Zote", "All")}</option>{regions.map((c) => <option key={c} value={c}>{c === "none" ? L("Haijawekwa", "Not set") : c}</option>)}</select></label>
       <label className="inline">{L("Kijiji", "Village")} <select value={village} onChange={(e) => setVillage(e.target.value)}><option value="">{L("Vyote", "All")}</option>{villages.map((v) => <option key={v}>{v}</option>)}</select></label>
       <span className="muted small">{L(`Rekodi ${recs.length} · robo hii dhidi ya robo iliyopita`, `${recs.length} records · this quarter vs last quarter`)}{sync.team && <> · {L("Timu", "Team")} {sync.team.name}: {sync.state === "busy" ? L("inasawazisha…", "syncing…") : sync.team.at ? L(`imesawazishwa ${new Date(sync.team.at).toLocaleTimeString()}`, `synced ${new Date(sync.team.at).toLocaleTimeString()}`) : L("bado", "not yet synced")}</>}</span>
       <span className="grow" />
@@ -246,11 +250,12 @@ export function Collect() {
   const sync = useSync(m.reload);
   const [kind, setKind] = useState<Kind>("payout");
   const today = new Date().toISOString().slice(0, 10);
-  const [base, setBase] = useState(() => read("jlc-mel-who", { village: "", collector: "" }));
+  const [base, setBase] = useState(() => ({ county: "", ...read("jlc-mel-who", { village: "", collector: "" }) }));
   const [date, setDate] = useState(today), [note, setNote] = useState(""), [v, setV] = useState<Record<string, string>>({}), [msg, setMsg] = useState("");
   const unshared = m.recs.filter((r) => r.createdAt > m.lastShare).length;
   const save = () => {
-    const c = checkRecord({ kind, date, village: base.village, collector: base.collector, note, v, createdAt: new Date().toISOString() });
+    if (!base.county) { setMsg(L("Chagua kaunti kwanza.", "Choose the county first.")); return; }
+    const c = checkRecord({ kind, date, county: base.county, village: base.village, collector: base.collector, note, v, createdAt: new Date().toISOString() });
     if (!c.ok) { const f = KINDS[kind].fields.find((x) => x.key === c.why); setMsg(L(`Angalia: ${f ? Tx(f.label) : c.why}`, `Check: ${f ? Tx(f.label) : c.why}`)); return; }
     m.setRecs([...m.recs, c.rec]); write("jlc-mel-who", base); setV({}); setNote(""); setMsg(L("Imehifadhiwa kwenye simu hii. ✔", "Saved on this phone. ✔"));
     sync.run();
@@ -280,6 +285,7 @@ export function Collect() {
         <div className="chips wrap" role="group" aria-label={L("Aina ya rekodi", "Record type")}>{(Object.keys(KINDS) as Kind[]).map((id) => <button key={id} aria-pressed={kind === id} onClick={() => { setKind(id); setV({}); setMsg(""); }}>{Tx(KINDS[id].name)}</button>)}</div>
         <div className="form-grid">
           <label>{L("Tarehe", "Date")} *<input type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} /></label>
+          <label>{L("Kaunti", "County")} *<select value={base.county} onChange={(e) => setBase({ ...base, county: e.target.value })}><option value="">—</option>{COUNTIES.map((c) => <option key={c}>{c}</option>)}</select></label>
           <label>{L("Kijiji", "Village")}<input value={base.village} maxLength={60} onChange={(e) => setBase({ ...base, village: e.target.value })} /></label>
           <label>{L("Mkusanyaji", "Collector")}<input value={base.collector} maxLength={60} onChange={(e) => setBase({ ...base, collector: e.target.value })} /></label>
           {KINDS[kind].fields.map((f) => <Input key={f.key} f={f} value={v[f.key] ?? ""} set={(x) => setV({ ...v, [f.key]: x })} />)}
@@ -303,7 +309,7 @@ export function Collect() {
     {m.recs.length > 0 && <section className="card">
       <h2>{L("Rekodi za simu hii", "Records on this phone")}</h2>
       <div className="table"><table><thead><tr><th>{L("Tarehe", "Date")}</th><th>{L("Aina", "Type")}</th><th>{L("Kijiji", "Village")}</th><th>{L("Data", "Data")}</th><th /></tr></thead>
-        <tbody>{[...m.recs].reverse().slice(0, 50).map((r) => <tr key={r.id}><td>{r.date}</td><td>{Tx(KINDS[r.kind].name)}</td><td>{r.village}</td>
+        <tbody>{[...m.recs].reverse().slice(0, 50).map((r) => <tr key={r.id}><td>{r.date}</td><td>{Tx(KINDS[r.kind].name)}</td><td>{[r.village, r.county].filter(Boolean).join(", ")}</td>
           <td className="small">{KINDS[r.kind].fields.filter((f) => r.v[f.key] != null).map((f) => `${Tx(f.label)}: ${f.options ? label(f.options, String(r.v[f.key]), Tx) : r.v[f.key]}`).join(" · ")}{r.note && <em className="block muted">"{r.note}"</em>}</td>
           <td><button className="icon" aria-label={L("Futa rekodi", "Delete record")} onClick={() => { if (confirm(L("Futa rekodi hii?", "Delete this record?"))) m.setRecs(m.recs.filter((x) => x.id !== r.id)); }}><Trash2 size={15} aria-hidden /></button></td></tr>)}</tbody></table></div>
     </section>}
