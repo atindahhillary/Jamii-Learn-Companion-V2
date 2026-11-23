@@ -37,6 +37,91 @@ const fmt = (v: number, unit: string) => (unit === "KES" ? `KES ${v >= 1e6 ? (v 
 const COLORS = ["#2f7d5b", "#1E88E5", "#FB8C00", "#E53935", "#7a3fa0", "#FDD835", "#29B6F6", "#9a7012"];
 const label = (opts: [string, T][] | undefined, k: string, Tx: (t: T) => string) => { const f = opts?.find(([id]) => id === k); return f ? Tx(f[1]) : k; };
 
+/* ---------------- Team sync: phones share records through the server whenever there is signal ---------------- */
+type Team = { code: string; name: string; cursor: number; at: string };
+const melApi = async (body: unknown) => {
+  const r = await fetch("/api/mel", { method: "POST", headers: { "content-type": "application/json", "x-ky": "1" }, body: JSON.stringify(body) });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(data.error ?? "server"), { status: r.status });
+  return data;
+};
+let running = false; // one sync at a time per page
+function useSync(setRecs: (r: Rec[]) => void) {
+  const [team, setTeamState] = useState<Team | null>(() => read("jlc-mel-team", null));
+  const [state, setState] = useState<"idle" | "busy" | "error">("idle"), [err, setErr] = useState("");
+  const setTeam = (t: Team | null) => {
+    if (t?.code !== read<Team | null>("jlc-mel-team", null)?.code) write("jlc-mel-synced", []); // a new team needs every record sent again
+    setTeamState(t); write("jlc-mel-team", t);
+  };
+  const waiting = () => { const done = new Set(read<string[]>("jlc-mel-synced", [])); return read<Rec[]>("jlc-mel-recs", []).filter((r) => !done.has(r.id)).length; };
+  const run = async (t = read<Team | null>("jlc-mel-team", null)) => {
+    if (!t || running || !navigator.onLine) return;
+    running = true; setState("busy"); setErr("");
+    try {
+      let cursor = t.cursor, more = true, name = t.name;
+      while (more) {
+        const recs = read<Rec[]>("jlc-mel-recs", []), done = new Set(read<string[]>("jlc-mel-synced", []));
+        const todo = recs.filter((r) => !done.has(r.id)).slice(0, 2000);
+        const res = await melApi({ op: "sync", code: t.code, records: todo, since: cursor });
+        const merged = merge(recs, res.records ?? []);
+        for (const r of [...todo, ...(res.records ?? [])]) done.add(r.id);
+        write("jlc-mel-recs", merged.all); write("jlc-mel-synced", [...done]); setRecs(merged.all);
+        cursor = res.cursor; name = res.team || name;
+        more = !!res.more || todo.length === 2000;
+      }
+      setTeam({ ...t, name, cursor, at: new Date().toISOString() }); setState("idle");
+    } catch (e: any) {
+      setState("error");
+      setErr(e?.status === 403 ? "unknown_team" : e?.status === 503 ? "not_configured" : e?.status ? "server" : "network");
+    } finally { running = false; }
+  };
+  useEffect(() => {
+    run();
+    const on = () => run(), every = setInterval(() => run(), 60_000);
+    addEventListener("online", on);
+    return () => { removeEventListener("online", on); clearInterval(every); };
+  }, [team?.code]);
+  return { team, setTeam, state, err, run, waiting };
+}
+
+function SyncPanel({ sync }: { sync: ReturnType<typeof useSync> }) {
+  const L = useL();
+  const online = useOnline();
+  const [name, setName] = useState(""), [code, setCode] = useState(""), [show, setShow] = useState(false), [busy, setBusy] = useState(false), [msg, setMsg] = useState("");
+  const errText: Record<string, string> = {
+    unknown_team: L("Nambari ya timu haitambuliki. Iangalie tena.", "Team code not recognised. Check it again."),
+    not_configured: L("Usawazishaji haujawashwa kwenye seva hii bado.", "Sync is not switched on for this server yet."),
+    server: L("Seva ina tatizo. Tutajaribu tena baada ya dakika moja.", "The server had a problem. We will try again in a minute."),
+    network: L("Hakuna mtandao. Rekodi zitatumwa mtandao ukirudi.", "No signal. Records will be sent when signal returns."),
+  };
+  if (!sync.team) return <section className="card stack-sm">
+    <h2>{L("Usawazishaji wa timu", "Team sync")}</h2>
+    <p className="small">{L("Unganisha simu za timu ili rekodi zifike kwa kila mtu na kwenye dashibodi moja, kila mtandao unapopatikana.", "Link the team's phones so records reach everyone and one shared dashboard whenever there is signal.")}</p>
+    <label>{L("Jiunge na timu: weka nambari ya timu", "Join a team: enter the team code")}<input value={code} placeholder="JLC-XXXX-XXXX-XXXX-XXXX" autoCapitalize="characters" onChange={(e) => setCode(e.target.value.toUpperCase())} /></label>
+    <button className="btn" disabled={!online || busy || !/^JLC(-[A-Z2-7]{4}){4}$/.test(code.trim())} onClick={async () => { const t = { code: code.trim(), name: "", cursor: 0, at: "" }; sync.setTeam(t); }}>{L("Jiunge", "Join")}</button>
+    <details><summary className="small"><b>{L("Mratibu? Unda timu mpya", "Coordinator? Create a new team")}</b></summary>
+      <label>{L("Jina la timu", "Team name")}<input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} /></label>
+      <button className="btn ghost" disabled={!online || busy || !name.trim()} onClick={async () => {
+        setBusy(true); setMsg("");
+        try { const r = await melApi({ op: "team", name: name.trim() }); sync.setTeam({ code: r.code, name: name.trim(), cursor: 0, at: "" }); }
+        catch (e: any) { setMsg(e?.status === 503 ? errText.not_configured : e?.status === 429 ? L("Subiri kidogo kisha ujaribu tena.", "Please wait a little and try again.") : errText.server); }
+        finally { setBusy(false); }
+      }}>{L("Unda timu", "Create team")}</button>
+    </details>
+    {!online && <p className="muted small">{L("Unahitaji mtandao kujiunga au kuunda timu. Unaweza kuendelea kukusanya data.", "You need signal to join or create a team. You can keep collecting meanwhile.")}</p>}
+    {msg && <p className="small" role="status">{msg}</p>}
+  </section>;
+  const wait = sync.waiting();
+  return <section className="card stack-sm">
+    <div className="row-between"><h2>{L("Timu", "Team")}: {sync.team.name || "…"}</h2><span className={`pill ${sync.state === "error" ? "alt" : ""}`}>{sync.state === "busy" ? L("Inasawazisha…", "Syncing…") : sync.state === "error" ? L("Haijasawazishwa", "Not synced") : L("Imesawazishwa", "Synced")}</span></div>
+    <p className="small" role="status">{sync.state === "error" ? errText[sync.err] : sync.team.at ? L(`Mara ya mwisho: ${new Date(sync.team.at).toLocaleString()}`, `Last synced: ${new Date(sync.team.at).toLocaleString()}`) : L("Bado haijasawazishwa.", "Not synced yet.")} · {L(`${wait} zinasubiri kutumwa`, `${wait} waiting to send`)}</p>
+    <div className="row"><button className="btn small" disabled={!online || sync.state === "busy"} onClick={() => sync.run()}>{L("Sawazisha sasa", "Sync now")}</button>
+      <button className="btn ghost small" onClick={() => setShow(!show)}>{show ? L("Ficha nambari", "Hide code") : L("Onyesha nambari ya timu", "Show team code")}</button></div>
+    {show && <p className="note small"><b className="mono">{sync.team.code}</b><br />{L("Shiriki nambari hii na wanatimu tu. Mwenye nambari anaweza kuona na kuongeza rekodi za timu.", "Share this code only with team members. Anyone with it can see and add the team's records.")}</p>}
+    <button className="link small" onClick={() => { if (confirm(L("Ondoka kwenye timu? Rekodi zinabaki kwenye simu hii.", "Leave the team? Records stay on this phone."))) sync.setTeam(null); }}>{L("Ondoka kwenye timu", "Leave team")}</button>
+  </section>;
+}
+
 /* ---------------- Dashboard ---------------- */
 const KPI_CARDS: [MetricKey, typeof Banknote, string][] = [["paid", Banknote, "#2f7d5b"], ["onTime", CalendarCheck, "#FB8C00"], ["households", Users, "#1E88E5"], ["jointDecide", Users, "#7a3fa0"], ["regen", Sprout, "#43A047"], ["reached", GraduationCap, "#E53935"]];
 
@@ -49,6 +134,7 @@ function Spark({ data, color }: { data: number[]; color: string }) {
 export function Dashboard({ open }: { open: (t: string) => void }) {
   const L = useL(), Tx = useT();
   const m = useMel();
+  const sync = useSync(m.setRecs); // the dashboard pulls the team's latest records whenever it is open with signal
   const villages = [...new Set(m.all.map((r) => r.village).filter(Boolean))].sort();
   const [village, setVillage] = useState("");
   const recs = village ? m.all.filter((r) => r.village === village) : m.all;
@@ -68,7 +154,7 @@ export function Dashboard({ open }: { open: (t: string) => void }) {
   return <div className="stack dash">
     <div className="dash-bar">
       <label className="inline">{L("Kijiji", "Village")} <select value={village} onChange={(e) => setVillage(e.target.value)}><option value="">{L("Vyote", "All")}</option>{villages.map((v) => <option key={v}>{v}</option>)}</select></label>
-      <span className="muted small">{L(`Rekodi ${recs.length} · robo hii dhidi ya robo iliyopita`, `${recs.length} records · this quarter vs last quarter`)}</span>
+      <span className="muted small">{L(`Rekodi ${recs.length} · robo hii dhidi ya robo iliyopita`, `${recs.length} records · this quarter vs last quarter`)}{sync.team && <> · {L("Timu", "Team")} {sync.team.name}: {sync.state === "busy" ? L("inasawazisha…", "syncing…") : sync.team.at ? L(`imesawazishwa ${new Date(sync.team.at).toLocaleTimeString()}`, `synced ${new Date(sync.team.at).toLocaleTimeString()}`) : L("bado", "not yet synced")}</>}</span>
       <span className="grow" />
       <label className="check small"><input type="checkbox" checked={m.showSample} onChange={(e) => m.setShowSample(e.target.checked)} /> {L("Jumuisha data ya mfano (ya kubuni)", "Include sample data (fictional)")}</label>
     </div>
@@ -127,6 +213,7 @@ function Input({ f, value, set }: { f: Field; value: string; set: (v: string) =>
 export function Collect() {
   const L = useL(), Tx = useT();
   const m = useMel(), online = useOnline();
+  const sync = useSync(m.setRecs);
   const [kind, setKind] = useState<Kind>("payout");
   const today = new Date().toISOString().slice(0, 10);
   const [base, setBase] = useState(() => read("jlc-mel-who", { village: "", collector: "" }));
@@ -136,6 +223,7 @@ export function Collect() {
     const c = checkRecord({ kind, date, village: base.village, collector: base.collector, note, v, createdAt: new Date().toISOString() });
     if (!c.ok) { const f = KINDS[kind].fields.find((x) => x.key === c.why); setMsg(L(`Angalia: ${f ? Tx(f.label) : c.why}`, `Check: ${f ? Tx(f.label) : c.why}`)); return; }
     m.setRecs([...m.recs, c.rec]); write("jlc-mel-who", base); setV({}); setNote(""); setMsg(L("Imehifadhiwa kwenye simu hii. ✔", "Saved on this phone. ✔"));
+    sync.run();
   };
   const file = () => new File([JSON.stringify({ app: "jamii-mel", v: 1, exported: new Date().toISOString(), records: m.recs, issues: m.issues })], `jamii-data-${today}-${(base.collector || "device").replace(/\W+/g, "-")}.json`, { type: "application/json" });
   const share = async () => {
@@ -169,8 +257,10 @@ export function Collect() {
         <label>{L("Walichosema, kwa maneno yao", "What they said, in their own words")}<textarea rows={3} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} /></label>
         <div className="row"><button className="btn" onClick={save}><Plus size={16} aria-hidden /> {L("Hifadhi rekodi", "Save record")}</button>{msg && <span role="status" className="small">{msg}</span>}</div>
       </section>
+      <div className="stack">
+      <SyncPanel sync={sync} />
       <section className="card stack-sm">
-        <h2>{L("Shiriki na unganisha", "Share and combine")}</h2>
+        <h2>{L("Shiriki kwa faili (bila mtandao)", "Share by file (no signal)")}</h2>
         <p className="small">{L(`Rekodi ${m.recs.length} kwenye simu hii; ${unshared} bado hazijashirikiwa.`, `${m.recs.length} records on this phone; ${unshared} not yet shared.`)}</p>
         <button className="btn" onClick={share} disabled={!m.recs.length}><Share2 size={16} aria-hidden /> {L("Tuma faili la data", "Send data file")}</button>
         <p className="muted small">{L("Tuma kwa mratibu kupitia WhatsApp, Bluetooth au barua pepe ukipata mtandao.", "Send to the coordinator by WhatsApp, Bluetooth or email when you have signal.")}</p>
@@ -178,6 +268,7 @@ export function Collect() {
         <button className="btn ghost" onClick={csv} disabled={!m.recs.length}><Download size={16} aria-hidden /> CSV (Excel)</button>
         <p className="muted small">{L("Rekodi zinahifadhiwa kama zilivyoandikwa. Faili likiunganishwa mara mbili, hakuna rekodi inayohesabiwa mara mbili.", "Records are kept exactly as entered. Combining the same file twice never counts a record twice.")}</p>
       </section>
+      </div>
     </div>
     {m.recs.length > 0 && <section className="card">
       <h2>{L("Rekodi za simu hii", "Records on this phone")}</h2>
