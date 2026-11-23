@@ -47,7 +47,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="shell" data-look={look}>
       <a className="skip" href="#main">{L("Ruka hadi maudhui", "Skip to content")}</a>
       <aside className="side">
-        <div className="brand"><Mascot size={38} /><span>Jamii Learn Companion</span></div>
+        <div className="brand"><Mascot size={38} /><span>Jamii Learn Companion V2</span></div>
         {look === "soft" && <div className="me-card"><Mascot size={84} /><b>{me!.name}</b><small>{me!.community?.name ?? L("Mshiriki", "Learner")}</small></div>}
         <nav aria-label={L("Menyu kuu", "Main menu")}>
           {nav.map(([id, Icon, name]: any) => (

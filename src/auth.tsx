@@ -40,7 +40,7 @@ export function Auth() {
           <button aria-pressed={lang === "en"} onClick={() => setLang("en")}>English</button>
         </div>
         <Mascot size={120} />
-        <h1>Jamii Learn Companion</h1>
+        <h1>Jamii Learn Companion V2</h1>
         <p>{L("Ardhi yetu. Sauti yetu. Uamuzi wetu.", "Our land. Our voice. Our decision.")}</p>
         <ul>
           <li>{L("Tuambie unachojua na kinachokutia wasiwasi", "Tell us what you know and what worries you")}</li>

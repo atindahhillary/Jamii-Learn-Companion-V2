@@ -1,4 +1,6 @@
-# Jamii Learn Companion
+# Jamii Learn Companion V2
+
+Independent copy of [Jamii-Learn-Companion](https://github.com/atindahhillary/Jamii-Learn-Companion), made 2026-11-23 to build on separately. Changes here do not touch the main version.
 
 A Kiswahili and English learning companion that helps Indigenous and local communities in Kenya understand carbon markets on their own terms. It listens first, turns what people say into a community training plan, and gives facilitators dashboards and a report.
 
