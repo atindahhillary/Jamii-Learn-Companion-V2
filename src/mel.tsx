@@ -7,6 +7,7 @@ import {
   type Field, type Indicator, type Issue, type Item, type Kind, type MetricKey, type Rec,
 } from "../shared/mel";
 import { AreaChart, Bars, Donut } from "./charts";
+import { KenyaMap } from "./kenyamap";
 import { useL, useT } from "./core";
 
 /* ---------------- Device store (works offline) ---------------- */
@@ -216,6 +217,7 @@ export function Dashboard({ open }: { open: (t: string) => void }) {
         </div>
       </section>;
     })}</div>
+    <KenyaMap region={m.region} setRegion={(c) => { m.setRegion(c); setVillage(""); }} withData={new Set(m.recs.map((r) => r.county ?? "").filter(Boolean))} />
     <div className="dash-grid">
       <section className="card span2"><h2>{L("Mwenendo wa athari kwa mwezi", "Monthly impact trend")}</h2>
         <AreaChart label={L("Alama ya urejeshaji, malipo kwa wakati na wanawake waliofundishwa, kwa mwezi", "Regeneration score, on-time payments and women trained, by month")}

@@ -365,3 +365,17 @@ textarea { width: 100%; padding: 10px 14px; border: 1.5px solid #cfd8c6; border-
 @media (max-width: 860px) { .dash-grid, .form-grid { grid-template-columns: minmax(0, 1fr); } .span2 { grid-column: auto; } .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpi-card > b { font-size: 1.2rem; } .spark { width: 56px; } }
 @media print { .no-print, .demo-bar { display: none !important; } .brief { box-shadow: none; max-width: none; } }
 .sources { margin: 10px 0; text-align: left; } .sources a { color: var(--plum); }
+/* Kenya map */
+.map-wrap { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.kmap { width: 100%; max-height: 620px; }
+.kmap .county { stroke: #fff; stroke-width: 1.6; cursor: pointer; transition: filter .15s; }
+.kmap .county:hover, .kmap .county:focus { filter: brightness(.9); outline: none; }
+.kmap .county[data-sel=true] { stroke: var(--plum); stroke-width: 4; }
+.dot-restore { fill: #2f7d5b; } .dot-sink { fill: #1E88E5; } .dot-data { fill: #1d2b22; }
+.dot-n { fill: #fff; font-size: 23px; font-weight: 800; text-anchor: middle; }
+.map-legend { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.map-legend i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: middle; margin-right: 6px; }
+.map-legend i.dot-restore, .map-legend i.dot-sink, .map-legend i.dot-data { border-radius: 50%; }
+.map-legend i.dot-restore { background: #2f7d5b; } .map-legend i.dot-sink { background: #1E88E5; } .map-legend i.dot-data { background: #1d2b22; width: 10px; height: 10px; }
+.county-card { background: var(--bg); border-radius: 14px; padding: 12px; } .county-card h3 { margin-top: 0; } .county-card a { color: var(--plum); }
+@media (max-width: 860px) { .map-wrap { grid-template-columns: minmax(0, 1fr); } .kmap { max-height: 480px; } }
