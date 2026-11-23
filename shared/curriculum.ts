@@ -1,4 +1,5 @@
 import { o, type T, type Theme } from "./content.js";
+import { PILLAR_CARDS } from "./pillar-cards.js";
 
 export type Q = { q: T; options: T[]; answer: number; why: T };
 export type Module = { id: string; theme: Theme; title: T; minutes: number; points: T[]; activity: T; quiz: Q[] };
@@ -95,8 +96,9 @@ export const MODULES: Module[] = [
 ];
 
 // Short, sourced answers: the bot's offline brain and the context handed to the model.
-export type Card = { id: string; theme: Theme; words: string[]; simple: T; detail: T; analogy: T; source: string };
-export const CARDS: Card[] = [
+// Pillar cards (shared/pillar-cards.ts) also name the Impact tab to open, the seat that leads, their own points and follow-ups.
+export type Card = { id: string; theme: Theme; words: string[]; simple: T; detail: T; analogy: T; source: string; tool?: string; lead?: string; takes?: [string, T][]; follow?: T[] };
+const BASE_CARDS: Card[] = [
   { id: "credit", theme: "carbon_basics", words: ["kaboni", "carbon", "credit", "mkopo", "mikopo"],
     simple: o("Mkopo wa kaboni ni kama risiti inayosema tani moja ya gesi chafu imepunguzwa. Kampuni hununua risiti hiyo ili kufidia uchafuzi wake.", "A carbon credit is like a receipt saying one tonne of polluting gas was avoided. A company buys that receipt to offset its pollution."),
     detail: o("Mkopo mmoja = tani moja ya CO2e iliyopunguzwa au kuondolewa, hutolewa na kiwango kama Verra au Gold Standard baada ya ukaguzi, na hustaafishwa unapotumiwa. Kenya, miradi lazima ipitie Mamlaka Teule ya Taifa chini ya Kanuni za 2024.", "One credit = one tonne of CO2e reduced or removed, issued by a standard such as Verra or Gold Standard after audit, and retired on use. In Kenya, projects go through the Designated National Authority under the 2024 Regulations."),
@@ -163,3 +165,5 @@ export const CARDS: Card[] = [
     analogy: o("Ni kama kugawa nyama kwenye sherehe: kila kundi linajua sehemu yake, na hakuna anayesahaulika.", "It is like sharing meat at a celebration: every group knows its portion, and no one is forgotten."),
     source: "Fourth Schedule cl 9, 24" },
 ];
+// Pillar cards come last, so on an equal score the original topic answers still win.
+export const CARDS: Card[] = [...BASE_CARDS, ...PILLAR_CARDS];

@@ -2,6 +2,7 @@
 // and weave the listening questions into the conversation instead of asking them up front.
 import { CARDS, MODULES, type Card } from "./curriculum.js";
 import { STORY } from "./story.js";
+import { TOOL_NAMES } from "./pillar-cards.js";
 import { INTAKE, o, routeExpert, type Audience, type Lang, type T, type Theme } from "./content.js";
 
 // Which seat leads each topic, and which lesson illustration goes with it.
@@ -82,7 +83,7 @@ export const LEAD_IN: T[] = [o("Sasa nami nikuulize jambo moja.", "Now let me as
 export const INVITE = o("Ungependa kujua nini zaidi? Chagua swali hapa chini au uliza lako.", "What would you like to know more about? Pick a question below or ask your own.");
 export const DONE = o("Asante kwa kushiriki mawazo yako. Sauti yako sasa ni sehemu ya mpango wa mafunzo ya jamii yako.", "Thank you for sharing your thoughts. Your voice now shapes your community's training plan.");
 export const FOOT = o("Hakiki na mtu unayemwamini kabla ya kuamua.", "Check with someone you trust before deciding.");
-export const NO_CARD = o("Sina uhakika kuhusu hilo bado. Jaribu kuuliza kuhusu mikopo ya kaboni, mgao, ridhaa, mkataba, ardhi au malisho.", "I am not sure about that yet. Try asking about carbon credits, the share, consent, the agreement, land or grazing.");
+export const NO_CARD = o("Sina uhakika kuhusu hilo bado. Jaribu kuuliza kuhusu mikopo ya kaboni, mgao, ridhaa, mkataba, ardhi au malisho, au pesa zinakwenda wapi, mabadiliko ya kaya, urejeshaji wa ardhi na kilimo bora.", "I am not sure about that yet. Try asking about carbon credits, the share, consent, the agreement, land or grazing, or where the money goes, household change, regeneration and clever farming.");
 export const GAME = o("Mchezo: gawanyeni vikundi viwili. Kimoja kitetee hoja hii, kingine kiulize maswali matatu magumu.", "Game: split into two groups. One defends this idea, the other asks three hard questions.");
 
 // Suggested next questions; each one is worded to reach a card.
@@ -221,15 +222,18 @@ export function converse(text: string, u: Learner, opt: { mode?: Mode; pending: 
     parts.push(pick(intent!.say, mix)[L]);
     if (intent!.id === "decide") { theme = "contracts"; source = "Carbon Markets Regulations 2024; Fourth Schedule"; }
   } else if (card && answered == null) {
-    theme = card.theme; source = card.source; pic = picFor(card);
-    const lead = mode !== "ask" ? "mwalimu" : routeExpert(t).id === "mzee" ? "mzee" : MODULES_THEME_EXPERT.expert[card.theme];
+    theme = card.theme; source = card.source; pic = card.tool ? null : picFor(card);
+    const lead = mode !== "ask" ? "mwalimu" : routeExpert(t).id === "mzee" ? "mzee" : card.lead ?? MODULES_THEME_EXPERT.expert[card.theme];
     // One loose word ("price" in a question about maize) gets the carbon answer, but says so.
     const hit = card.words.filter((x) => w.includes(x));
     const loose = hit.length === 1 && !hit[0].includes(" ") && !starts(w, CORE);
     if (loose) parts.push(L === "sw" ? "Nikielewa kuwa unauliza kuhusu miradi ya kaboni:" : "If you are asking about carbon projects:");
     parts.push(pick(OPENERS[lead], mix)[L], mode === "ask" ? card[levelFor(u.audience)][L] : card.analogy[L]);
     if (mode === "game") parts.push(GAME[L]);
-    if (mode === "ask") {
+    if (mode === "ask" && card.takes) {
+      // Pillar answers carry their own points from other seats, then point to the tool to try it with real numbers.
+      parts.push(`${ALSO[L]}\n${card.takes.filter(([e]) => e !== lead).map(([, x]) => `• ${x[L]}`).join("\n")}`);
+    } else if (mode === "ask") {
       const others = TAKES[card.theme].filter(([e]) => e !== lead);
       const m = MODULES.find((x) => x.theme === card.theme)!;
       const fact = pick(m.points, mix)[L];
@@ -240,6 +244,7 @@ export function converse(text: string, u: Learner, opt: { mode?: Mode; pending: 
       if (shape === 1 && !parts.some((p) => p.includes(fact))) parts.push(`${KNOW[L]} ${fact}`);
       if (shape === 2) parts.push(`${THINK[L]} ${STORY[m.id].ask[L]}`);
     }
+    if (card.tool) parts.push(L === "sw" ? `Ijaribu kwa hali yenu: kwenye programu fungua Athari, kisha "${TOOL_NAMES[card.tool].sw}".` : `Try it for your own situation: in the app open Impact, then "${TOOL_NAMES[card.tool].en}".`);
     parts.push(pick(FOOTS, mix)[L]);
   } else if (answered == null) {
     const near = nearTheme(w);
@@ -265,7 +270,8 @@ export function converse(text: string, u: Learner, opt: { mode?: Mode; pending: 
     asks = step;
   }
   // Suggested questions rotate through everything on the topic, so the chips change from turn to turn.
-  const pool = theme ? [...FOLLOW[theme], ...Object.values(FOLLOW).flat()] : [...STARTERS, ...Object.values(FOLLOW).flat()];
+  const own = card && answered == null && !useIntent ? card.follow ?? [] : [];
+  const pool = own.length ? [...own, ...Object.values(FOLLOW).flat()] : theme ? [...FOLLOW[theme], ...Object.values(FOLLOW).flat()] : [...STARTERS, ...Object.values(FOLLOW).flat()];
   const uniq = [...new Map(pool.map((f) => [f[L], f[L]])).values()].filter((f) => f.toLowerCase() !== t.toLowerCase());
   const followups = theme ? [...uniq.slice(0, 3).slice(mix % 2), ...uniq.slice(3)].slice(0, 3) : [0, 1, 2].map((i) => uniq[(mix + i * 5) % uniq.length]);
   return { replies: [{ expert: COMPANION_ID, body: parts.filter(Boolean).join("\n\n"), source, pic, asks }], followups: [...new Set(followups)], answered };
