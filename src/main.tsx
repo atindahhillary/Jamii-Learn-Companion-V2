@@ -1,4 +1,4 @@
-import { BarChart3, BookOpen, CircleUserRound, Home, LogOut, MessageCircle, ShieldCheck, Users, Wrench, X } from "lucide-react";
+import { BarChart3, BookOpen, CircleUserRound, Home, LogOut, MessageCircle, ShieldCheck, Sprout, Users, Wrench, X } from "lucide-react";
 import { Component, Suspense, lazy, useEffect, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import type { Lang } from "../shared/content";
@@ -30,6 +30,7 @@ const Circles = lazy(page(() => import("./learn").then((m) => ({ default: m.Circ
 const Tools = lazy(page(() => import("./learn").then((m) => ({ default: m.Tools }))));
 const HomePage = lazy(page(() => import("./home").then((m) => ({ default: m.HomePage }))));
 const Profile = lazy(page(() => import("./home").then((m) => ({ default: m.Profile }))));
+const Impact = lazy(page(() => import("./impact").then((m) => ({ default: m.Impact }))));
 import "./styles.css";
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -39,8 +40,8 @@ function Shell({ children }: { children: React.ReactNode }) {
   // The demo notice can be closed, which gives the chat more room on a phone.
   const [hideDemo, setHideDemo] = useState(() => { try { return localStorage.getItem("jlc-demo-bar") === "1"; } catch { return false; } });
   const nav = isAdmin
-    ? [["admin", BarChart3, L("Dashibodi", "Dashboard")], ["circles", Users, L("Makundi", "Circles")], ["chat", MessageCircle, L("Msaidizi", "Assistant")], ["profile", CircleUserRound, L("Wasifu", "Profile")]]
-    : [["home", Home, L("Nyumbani", "Home")], ["chat", MessageCircle, L("Msaidizi", "Assistant")], ["learn", BookOpen, L("Mafunzo", "Learn")], ["circles", Users, L("Makundi", "Circles")], ["tools", Wrench, L("Zana", "Tools")], ["profile", CircleUserRound, L("Wasifu", "Profile")]];
+    ? [["admin", BarChart3, L("Dashibodi", "Dashboard")], ["impact", Sprout, L("Athari", "Impact")], ["circles", Users, L("Makundi", "Circles")], ["chat", MessageCircle, L("Msaidizi", "Assistant")], ["profile", CircleUserRound, L("Wasifu", "Profile")]]
+    : [["home", Home, L("Nyumbani", "Home")], ["chat", MessageCircle, L("Msaidizi", "Assistant")], ["learn", BookOpen, L("Mafunzo", "Learn")], ["impact", Sprout, L("Athari", "Impact")], ["circles", Users, L("Makundi", "Circles")], ["tools", Wrench, L("Zana", "Tools")], ["profile", CircleUserRound, L("Wasifu", "Profile")]];
   const look = route === "chat" ? "plum" : isAdmin ? "vivid" : "soft";
   const top = route.split("/")[0];
   return (
@@ -96,7 +97,7 @@ function App() {
   if (me === undefined) return <Ctx.Provider value={value}><Loading /></Ctx.Provider>;
   if (!me) return <Ctx.Provider value={value}>{DEMO ? <DemoAuth /> : <Auth />}</Ctx.Provider>;
   const r = route.split("/")[0] || (me.role === "admin" ? "admin" : "home");
-  const page = r === "chat" ? <Chat /> : r === "learn" ? <Learn /> : r === "circles" ? <Circles /> : r === "tools" ? <Tools /> : r === "profile" ? <Profile /> : r === "admin" && me.role === "admin" ? <Admin /> : <HomePage />;
+  const page = r === "chat" ? <Chat /> : r === "learn" ? <Learn /> : r === "circles" ? <Circles /> : r === "tools" ? <Tools /> : r === "impact" ? <Impact /> : r === "profile" ? <Profile /> : r === "admin" && me.role === "admin" ? <Admin /> : <HomePage />;
   return <Ctx.Provider value={{ ...value, route: r }}><Shell>{page}</Shell></Ctx.Provider>;
 }
 

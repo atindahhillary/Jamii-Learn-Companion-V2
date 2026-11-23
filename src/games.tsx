@@ -1,4 +1,5 @@
-import { ArrowLeft, Coins, Flag, Play, Shuffle, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, Blocks, Coins, Flag, Play, Shuffle, Sparkles, Trash2, Wheat } from "lucide-react";
+import { BADGES, Herd, OFFLINE, Shilling } from "./brickgames";
 import { useMemo, useState } from "react";
 import { o, type T } from "../shared/content";
 import { Person } from "./avatars";
@@ -102,6 +103,15 @@ function Flags({ onBack }: { onBack: () => void }) {
   </Frame>;
 }
 
+function BrickGame({ id, title, host, onBack }: { id: "shilling" | "herd"; title: string; host: string; onBack: () => void }) {
+  const [say, setSay] = useState("");
+  const T = useT();
+  return <Frame title={title} onBack={onBack} host={host} say={say}>
+    {id === "shilling" ? <Shilling say={setSay} /> : <Herd say={setSay} />}
+    <p className="note small">🧱 {T(OFFLINE[id])}</p>
+  </Frame>;
+}
+
 function Frame({ title, onBack, host, say, children }: { title: string; onBack: () => void; host: string; say: string; children: React.ReactNode }) {
   const L = useL();
   return <div className="stack">
@@ -177,7 +187,7 @@ function Maker({ onMade }: { onMade: (g: Game) => void }) {
 }
 
 export function Games() {
-  const L = useL();
+  const L = useL(), T = useT();
   const [g, setG] = useState(""), [play, setPlay] = useState<Game | null>(null), [made, setMade] = useState<Game | null>(null);
   const mine = useData<Game[]>("/games");
   const back = () => { setPlay(null); setG(""); };
@@ -185,7 +195,11 @@ export function Games() {
   if (g === "match") return <Match onBack={back} pairs={PAIRS.map(([a, b]) => [L(a.sw, a.en), L(b.sw, b.en)] as [string, string])} />;
   if (g === "share") return <Share onBack={back} />;
   if (g === "flags") return <Flags onBack={back} />;
+  if (g === "shilling") return <BrickGame id="shilling" host="bibi" title={L("Fuata Shilingi", "Follow the Shilling")} onBack={back} />;
+  if (g === "herd") return <BrickGame id="herd" host="moran" title={L("Zungusha Mifugo", "Rotate the Herd")} onBack={back} />;
   const list: [string, typeof Shuffle, string, string, string][] = [
+    ["shilling", Blocks, "bibi", L("Fuata Shilingi", "Follow the Shilling"), L("Tazama, kumbuka, jenga mnara wa pesa", "Look, remember, rebuild the money tower")],
+    ["herd", Wheat, "moran", L("Zungusha Mifugo", "Rotate the Herd"), L("Pumzisha malisho, linda nyasi misimu minane", "Rest the paddocks, keep grass alive for eight seasons")],
     ["match", Shuffle, "mwalimu", L("Linganisha maneno", "Match the words"), L("Kumbuka maneno muhimu ya kaboni", "Remember the key carbon words")],
     ["share", Coins, "bibi", L("Hesabu ya mgao", "Work out the share"), L("40% ya nini? Fanya hesabu sokoni", "40% of what? Do the market maths")],
     ["flags", Flag, "mama", L("Bendera nyekundu", "Red flags"), L("Tambua vifungu vya kuuliza zaidi", "Spot clauses that need more questions")],
@@ -204,6 +218,9 @@ export function Games() {
         <div key={x.id} className="game card"><button className="link grow" onClick={() => setPlay(x)}><b>{x.title}</b><small className="muted block">{x.kind === "match" ? L("Linganisha", "Match") : L("Maswali", "Quiz")} · {x.lang}</small></button>
           <button className="icon" aria-label={L(`Futa ${x.title}`, `Delete ${x.title}`)} onClick={async () => { await api(`/games/${x.id}`, { method: "DELETE" }); mine.reload(); }}><Trash2 size={16} aria-hidden /></button></div>
       ))}</div></>}
+    <section className="card"><h3>{L("Beji zangu", "My badges")}</h3>
+      <div className="badges">{BADGES.map((b) => { const got = b.got(); return <div key={b.id} className="badge" data-got={got} title={T(b.how)}><span aria-hidden>{b.icon}</span><b>{T(b.name)}</b><small className="muted">{got ? L("Umepata!", "Earned!") : T(b.how)}</small></div>; })}</div>
+    </section>
     <h3>{L("Michezo iliyo tayari", "Ready-made games")}</h3>
     <div className="lessons">
       {list.map(([id, Icon, look, name, sub]) => (

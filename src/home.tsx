@@ -14,6 +14,8 @@ export type LearnData = {
   activity: { day: string; n: number }[]; plan: { moduleId: string; theme: string; order: number; week?: number; reason?: T }[]; goal?: Goal | null;
 };
 
+const PILLARS: [string, string, string][] = [["money", "Njia ya pesa", "Money trail"], ["change", "Mabadiliko ya kaya", "Household change"], ["economics", "Uchumi wa mabadiliko", "Economics of change"], ["pathways", "Njia za maarifa", "Knowledge pathways"], ["regen", "Kipimo cha ardhi", "Land monitor"], ["farming", "Kilimo bora", "Clever farming"]];
+
 export function HomePage() {
   const { me, go } = useApp();
   const L = useL(), T = useT();
@@ -54,6 +56,10 @@ export function HomePage() {
       {listening && (
         <button className="banner" onClick={() => go("chat")}><Mascot size={64} /><span><b>{L("Kwanza, tukusikilize", "First, let us listen to you")}</b><small>{L(`Maswali ${me!.intakeTotal - me!.intakeStep} yamebaki. Majibu yako yanaunda mafunzo ya jamii.`, `${me!.intakeTotal - me!.intakeStep} questions left. Your answers shape your community's training.`)}</small></span></button>
       )}
+      <section className="card" aria-label={L("Nguzo sita za athari", "Six impact pillars")}>
+        <div className="row-between"><h2>{L("Kutoka maarifa hadi ustawi wa kaya", "From knowledge to household wellbeing")}</h2><button className="link" onClick={() => go("impact")}>{L("Picha kamili", "Whole picture")} →</button></div>
+        <div className="chips wrap">{PILLARS.map(([t, sw, en]) => <button key={t} onClick={() => go(`impact/${t}`)}>{L(sw, en)}</button>)}</div>
+      </section>
       <section className="card land-card home-land">
         <Land done={done.length} />
         <div className="land-over"><b>{L("Ardhi yako inachanua", "Your land is coming to life")}</b><small>{L(`Miti ${done.length} kati ya ${MODULES.length}`, `${done.length} of ${MODULES.length} trees`)}</small><button className="btn small" onClick={() => go("learn")}>{L("Endelea safari", "Continue the journey")}</button></div>

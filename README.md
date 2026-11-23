@@ -4,6 +4,21 @@ Independent copy of [Jamii-Learn-Companion](https://github.com/atindahhillary/Ja
 
 A Kiswahili and English learning companion that helps Indigenous and local communities in Kenya understand carbon markets on their own terms. It listens first, turns what people say into a community training plan, and gives facilitators dashboards and a report.
 
+## V2: the six impact pillars (expert meeting, November 2026)
+
+The **Impact** page (`src/impact.tsx`, logic in `shared/impact.ts`, tests in `tests/impact.test.ts`) answers six highlights from an expert meeting, plus a table of the gaps each expert saw and where the app answers them:
+
+1. **Money trail**: every shilling from credit sale to household (buffer pool, broker, verification, cost of doing business, reg 29 share of 40% or 25% after costs, community split, per-household payout), with the proof to ask for at each step and a check that the lines add up. A stability reserve shows how payouts stay reliable through a drought year.
+2. **Household change**: a seven-step theory of change inside the household (indicator and assumption at each step, including who decides) and a payout-split tool.
+3. **Economics of change**: 10-year gains against costs, break-even, NPV, a local spending multiplier (LM3 idea, an illustration only) and economies of scale for group monitoring.
+4. **Knowledge pathways**: what community, organisations and policy people, schools and adult trainers each need, do and produce, with CBE Junior School links (not reviewed by KICD).
+5. **Land monitor**: season-by-season plot checks with a stick, a spade and a cup of water, a 0-100 regeneration score, alerts and CSV export. It does not count carbon tonnes.
+6. **Clever farming**: eight regenerative practices filtered by season.
+
+**Games** take ideas from Enkaji Play: Six Bricks colours, look-remember-rebuild towers, levels, stars, badges and a no-phone version of every game (`src/brickgames.tsx`: Follow the Shilling, Rotate the Herd).
+
+All example numbers are made up. In the demo everything is saved on the device only.
+
 ## Live demo
 
 The public site runs with `VITE_DEMO=1`: everything happens in the visitor's browser (`src/demo.ts`), with fictional sample data and prepared, sourced answers. No database, no accounts, no phone numbers, and what a visitor types stays on their device. Live AI and WhatsApp are off until the backend below is deployed. To go full stack, remove `.vercelignore`, change `buildCommand` back to `npm run build`, and add the `/api` rewrite.
