@@ -42,3 +42,39 @@ describe("team sync (real Postgres engine)", async () => {
     expect((await sync(db, { code: a, records: Array.from({ length: 2001 }, (_, i) => pay(`x${i}`, 1)) })).status).toBe(413);
   });
 });
+
+describe("team sync of issues and indicators", async () => {
+  const { DEFAULT_INDICATORS, SAMPLE_ISSUES, applyItems } = await import("../shared/mel");
+  const pg = new PGlite();
+  const db: Db = { query: (sql, params) => pg.query(sql, params as any[]) };
+  const issue = (ts: string, stage: number) => ({ kind: "issue", id: "a-real", ts, data: { ...SAMPLE_ISSUES[0], id: "a-real", stage, ts } });
+
+  it("newest edit wins, whatever order phones sync in", async () => {
+    const code = (await createTeam(db, "T")).body.code as string;
+    await sync(db, { code, items: [issue("2026-11-23T10:00:00.000Z", 3)] });
+    await sync(db, { code, items: [issue("2026-11-23T09:00:00.000Z", 1)] }); // an older edit arrives late
+    const r = await sync(db, { code, itemsSince: 0 });
+    expect((r.body.items as any[]).map((i) => i.data.stage)).toEqual([3]);
+  });
+
+  it("deletions reach other phones and sample issues never leave the phone", async () => {
+    const code = (await createTeam(db, "T2")).body.code as string;
+    const ind = DEFAULT_INDICATORS[0];
+    await sync(db, { code, items: [{ kind: "indicator", id: ind.id, ts: "", data: ind }, { kind: "issue", id: SAMPLE_ISSUES[0].id, ts: "2026-11-23T10:00:00.000Z", data: SAMPLE_ISSUES[0] }, issue("2026-11-23T10:00:00.000Z", 2), issue("2026-11-23T11:00:00.000Z", 4)] });
+    let r = await sync(db, { code, itemsSince: 0 });
+    expect((r.body.items as any[]).map((i) => `${i.kind}:${i.id}`).sort()).toEqual(["indicator:i-ontime", "issue:a-real"]);
+    expect((r.body.items as any[]).find((i) => i.id === "a-real").data.stage).toBe(4); // duplicate in one batch: newest kept
+    await sync(db, { code, items: [{ kind: "issue", id: "a-real", ts: "2026-11-23T12:00:00.000Z", deleted: true }] });
+    r = await sync(db, { code, itemsSince: r.body.itemsCursor });
+    expect(r.body.items).toEqual([{ kind: "issue", id: "a-real", ts: "2026-11-23T12:00:00.000Z", deleted: true }]);
+    // On the other phone the issue disappears and is remembered as deleted.
+    const phone = applyItems([{ id: "a-real", ts: "2026-11-23T11:00:00.000Z" }], [], r.body.items as any);
+    expect(phone).toEqual({ list: [], tombs: [{ id: "a-real", ts: "2026-11-23T12:00:00.000Z" }] });
+  });
+
+  it("rejects malformed items", async () => {
+    const code = (await createTeam(db, "T3")).body.code as string;
+    const r = await sync(db, { code, items: [{ kind: "issue", id: "x", ts: "now", data: {} }, { kind: "indicator", id: "y", ts: "", data: { id: "y", metric: "hack" } }, { kind: "evil", id: "z", ts: "" }] });
+    expect(r.body.items).toEqual([]);
+  });
+});

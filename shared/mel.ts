@@ -165,7 +165,7 @@ export const acresOf = (r: Rec) => n(r.v.acres);
 
 /* ---------------- SMART indicators ---------------- */
 
-export type Indicator = { id: string; pillar: string; name: T; metric: MetricKey; baseline: number; target: number; due: string; source: T; frequency: T; owner: string };
+export type Indicator = { id: string; pillar: string; name: T; metric: MetricKey; baseline: number; target: number; due: string; source: T; frequency: T; owner: string; ts?: string };
 export const DEFAULT_INDICATORS: Indicator[] = [
   { id: "i-ontime", pillar: "money", metric: "onTime", name: o("90% ya malipo ya kaya yanafika kwa wakati ulioahidiwa ifikapo Desemba 2027", "90% of household payouts arrive on the promised date by December 2027"), baseline: 55, target: 90, due: "2027-12-31", source: o("Fomu ya malipo kwa kaya", "Household payout form"), frequency: o("Kila malipo", "Every payment"), owner: "CDA treasurer" },
   { id: "i-paid", pillar: "money", metric: "paid", name: o("KES milioni 2 zinafika moja kwa moja kwa kaya ifikapo Juni 2027", "KES 2 million reaches households directly by June 2027"), baseline: 0, target: 2_000_000, due: "2027-06-30", source: o("Fomu ya malipo kwa kaya", "Household payout form"), frequency: o("Kila malipo", "Every payment"), owner: "CDA committee" },
@@ -200,13 +200,60 @@ export const progress = (i: Indicator, value: number) => {
 
 export const STAGES: T[] = [o("Kutambua tatizo", "Issue identified"), o("Ushahidi umekusanywa", "Evidence gathered"), o("Mazungumzo na watoa uamuzi", "Decision makers engaged"), o("Wameweka kwenye ajenda", "On the agenda"), o("Ahadi imetolewa", "Commitment made"), o("Sera / uamuzi umebadilika", "Policy or decision changed"), o("Inatekelezwa", "Being implemented")];
 export const LEVELS: [string, T][] = [["cda", o("Kamati ya CDA", "CDA committee")], ["ward", o("Wadi", "Ward")], ["county", o("Kaunti", "County")], ["national", o("Taifa", "National")]];
-export type Issue = { id: string; title: string; level: string; target: string; ask: string; evidence: string[]; stage: number; next: string; updated: string; log: { date: string; stage: number; note: string }[] };
+export type Issue = { id: string; title: string; level: string; target: string; ask: string; evidence: string[]; stage: number; next: string; updated: string; log: { date: string; stage: number; note: string }[]; ts?: string };
 export const SAMPLE_ISSUES: Issue[] = [
   { id: "a1", title: "Annual earnings report read out at the community assembly", level: "cda", target: "CDA committee chair", ask: "Publish and read out the yearly earnings and cost report, as the CDA requires", evidence: ["i-paid", "i-ontime"], stage: 4, next: "Agree the date of the first public reading", updated: "2026-10-14", log: [] },
   { id: "a2", title: "Joint-name household payments", level: "cda", target: "CDA committee", ask: "Pay households into joint names by default", evidence: ["i-women", "i-joint"], stage: 2, next: "Share the payout data by gender at the next meeting", updated: "2026-11-02", log: [] },
   { id: "a3", title: "County budget line for community land monitors", level: "county", target: "County environment committee", ask: "Fund 20 youth land monitors in the next budget", evidence: ["i-regen", "i-practice"], stage: 1, next: "Write a one-page brief from the land monitor data", updated: "2026-11-10", log: [] },
 ];
 export const stageCounts = (issues: Issue[]) => STAGES.map((_, s) => issues.filter((i) => i.stage === s).length);
+export const isSampleIssue = (id: string) => SAMPLE_ISSUES.some((s) => s.id === id); // fictional; never sent to a team
+
+/* ---------------- Shared team items (issues and indicators): checked at the trust boundary ---------------- */
+
+export type ItemKind = "issue" | "indicator";
+export type Item = { kind: ItemKind; id: string; ts: string; deleted?: boolean; data?: Issue | Indicator };
+const str = (x: unknown, max: number) => (typeof x === "string" ? x.slice(0, max) : "");
+const txt = (x: any, max: number): T => ({ sw: str(x?.sw, max), en: str(x?.en, max) });
+const ISO = /^(\d{4}-\d{2}-\d{2}T[\d:.]+Z)?$/;
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+export function checkIssue(x: any): Issue | null {
+  if (!x || typeof x !== "object" || !str(x.id, 40) || !str(x.title, 120).trim() || !LEVELS.some(([k]) => k === x.level)) return null;
+  if (!Number.isInteger(x.stage) || x.stage < 0 || x.stage >= STAGES.length) return null;
+  return {
+    id: str(x.id, 40), title: str(x.title, 120), level: x.level, target: str(x.target, 80), ask: str(x.ask, 200), next: str(x.next, 160),
+    evidence: Array.isArray(x.evidence) ? x.evidence.filter((e: unknown) => typeof e === "string").slice(0, 20).map((e: string) => e.slice(0, 40)) : [],
+    stage: x.stage, updated: DAY.test(str(x.updated, 10)) ? x.updated : "", ts: ISO.test(str(x.ts, 30)) ? str(x.ts, 30) : "",
+    log: Array.isArray(x.log) ? x.log.slice(-50).filter((l: any) => l && DAY.test(str(l.date, 10)) && Number.isInteger(l.stage)).map((l: any) => ({ date: l.date, stage: Math.max(0, Math.min(STAGES.length - 1, l.stage)), note: str(l.note, 200) })) : [],
+  };
+}
+export function checkIndicator(x: any): Indicator | null {
+  if (!x || typeof x !== "object" || !str(x.id, 40) || !(x.metric in METRICS) || !DAY.test(str(x.due, 10))) return null;
+  if (![x.baseline, x.target].every((v) => typeof v === "number" && Number.isFinite(v) && Math.abs(v) < 1e12)) return null;
+  const name = txt(x.name, 200);
+  if (!name.en.trim() && !name.sw.trim()) return null;
+  return { id: str(x.id, 40), pillar: str(x.pillar, 20), name, metric: x.metric, baseline: x.baseline, target: x.target, due: x.due, source: txt(x.source, 80), frequency: txt(x.frequency, 60), owner: str(x.owner, 60), ts: ISO.test(str(x.ts, 30)) ? str(x.ts, 30) : "" };
+}
+export function checkItem(x: any): Item | null {
+  if (!x || (x.kind !== "issue" && x.kind !== "indicator") || !str(x.id, 40) || !ISO.test(str(x.ts, 30))) return null;
+  if (x.kind === "issue" && isSampleIssue(x.id)) return null;
+  if (x.deleted === true) return { kind: x.kind, id: str(x.id, 40), ts: str(x.ts, 30), deleted: true };
+  const data = x.kind === "issue" ? checkIssue(x.data) : checkIndicator(x.data);
+  return data && data.id === x.id ? { kind: x.kind, id: x.id, ts: str(x.ts, 30), data } : null;
+}
+// Newest edit wins, on the phone exactly as on the server. Tombstones remember deletions.
+export function applyItems<V extends { id: string; ts?: string }>(local: V[], tombs: { id: string; ts: string }[], incoming: Item[]) {
+  let list = [...local], dead = [...tombs];
+  for (const it of incoming) {
+    const mine = list.find((x) => x.id === it.id), tomb = dead.find((t) => t.id === it.id);
+    const localTs = mine?.ts ?? tomb?.ts ?? "";
+    if ((mine || tomb) && it.ts <= localTs) continue;
+    list = list.filter((x) => x.id !== it.id); dead = dead.filter((t) => t.id !== it.id);
+    if (it.deleted) dead.push({ id: it.id, ts: it.ts }); else list.push({ ...(it.data as unknown as V), ts: it.ts });
+  }
+  return { list, tombs: dead };
+}
 
 /* ---------------- Sample data (fictional, for the demo) ---------------- */
 

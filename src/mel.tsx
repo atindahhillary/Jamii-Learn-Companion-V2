@@ -3,29 +3,43 @@ import { useEffect, useMemo, useState } from "react";
 import type { T } from "../shared/content";
 import { BUCKETS, PRACTICES } from "../shared/impact";
 import {
-  AUDIENCE_OPTS, DEFAULT_INDICATORS, KINDS, LEVELS, METRICS, SAMPLE_ISSUES, STAGES, breakdown, byMonth, checkRecord, kpi, merge, metric, months, people, progress, sampleRecords, smart, stageCounts, toCsv,
-  type Field, type Indicator, type Issue, type Kind, type MetricKey, type Rec,
+  AUDIENCE_OPTS, DEFAULT_INDICATORS, KINDS, LEVELS, METRICS, SAMPLE_ISSUES, STAGES, applyItems, breakdown, byMonth, checkRecord, isSampleIssue, kpi, merge, metric, months, people, progress, sampleRecords, smart, stageCounts, toCsv,
+  type Field, type Indicator, type Issue, type Item, type Kind, type MetricKey, type Rec,
 } from "../shared/mel";
 import { AreaChart, Bars, Donut } from "./charts";
 import { useL, useT } from "./core";
 
 /* ---------------- Device store (works offline) ---------------- */
-// shortcut: records live on this device and move between phones as files; add server sync when the database is switched on.
+// Everything is kept on the phone first, so collection never waits for signal; team sync and files move it between phones.
 const read = <V,>(k: string, d: V): V => { try { const s = localStorage.getItem(k); return s ? JSON.parse(s) : d; } catch { return d; } };
 const write = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
-function useStore<V>(key: string, init: V): [V, (v: V) => void] {
+function useStore<V>(key: string, init: V): [V, (v: V) => void, () => void] {
   const [v, setV] = useState<V>(() => read(key, init));
   useEffect(() => { const f = (e: StorageEvent) => { if (e.key === key) setV(read(key, init)); }; addEventListener("storage", f); return () => removeEventListener("storage", f); }, [key]);
-  return [v, (x) => { setV(x); if (!write(key, x)) alert("This phone's storage is full. Export your records now so nothing is lost."); }];
+  return [v, (x) => { setV(x); if (!write(key, x)) alert("This phone's storage is full. Export your records now so nothing is lost."); }, () => setV(read(key, init))];
 }
+type Tomb = { id: string; ts: string };
+const now = () => new Date().toISOString();
 export function useMel() {
-  const [recs, setRecs] = useStore<Rec[]>("jlc-mel-recs", []);
-  const [indicators, setIndicators] = useStore<Indicator[]>("jlc-mel-ind", DEFAULT_INDICATORS);
-  const [issues, setIssues] = useStore<Issue[]>("jlc-mel-issues", SAMPLE_ISSUES);
+  const [recs, setRecs, reloadRecs] = useStore<Rec[]>("jlc-mel-recs", []);
+  const [indicators, setIndicators, reloadInd] = useStore<Indicator[]>("jlc-mel-ind", DEFAULT_INDICATORS);
+  const [stored, setStored, reloadIssues] = useStore<Issue[]>("jlc-mel-issues", SAMPLE_ISSUES);
   const [showSample, setShowSample] = useStore("jlc-mel-sample", true);
   const [lastShare, setLastShare] = useStore("jlc-mel-shared", "");
   const sample = useMemo(() => (showSample ? sampleRecords() : []), [showSample]);
-  return { recs, setRecs, all: [...sample, ...recs], indicators, setIndicators, issues, setIssues, showSample, setShowSample, lastShare, setLastShare };
+  const bury = (kind: "issue" | "indicator", id: string) => write(`jlc-mel-tomb-${kind}`, [...read<Tomb[]>(`jlc-mel-tomb-${kind}`, []).filter((t) => t.id !== id), { id, ts: now() }]);
+  // Fictional sample issues show only with sample data on, and are never sent to a team.
+  const issues = showSample ? stored : stored.filter((i) => !isSampleIssue(i.id));
+  return {
+    recs, setRecs, all: [...sample, ...recs], showSample, setShowSample, lastShare, setLastShare,
+    indicators, issues,
+    saveIndicator: (i: Indicator) => setIndicators([...indicators.filter((x) => x.id !== i.id), { ...i, ts: now() }]),
+    deleteIndicator: (id: string) => { bury("indicator", id); setIndicators(indicators.filter((x) => x.id !== id)); },
+    addDefaults: () => setIndicators([...indicators, ...DEFAULT_INDICATORS.filter((d) => !indicators.some((x) => x.id === d.id)).map((d) => ({ ...d, ts: now() }))]),
+    saveIssue: (i: Issue) => setStored(stored.some((x) => x.id === i.id) ? stored.map((x) => (x.id === i.id ? { ...i, ts: now() } : x)) : [...stored, { ...i, ts: now() }]),
+    deleteIssue: (id: string) => { bury("issue", id); setStored(stored.filter((x) => x.id !== id)); },
+    reload: () => { reloadRecs(); reloadInd(); reloadIssues(); },
+  };
 }
 function useOnline() {
   const [on, setOn] = useState(() => navigator.onLine);
@@ -38,7 +52,21 @@ const COLORS = ["#2f7d5b", "#1E88E5", "#FB8C00", "#E53935", "#7a3fa0", "#FDD835"
 const label = (opts: [string, T][] | undefined, k: string, Tx: (t: T) => string) => { const f = opts?.find(([id]) => id === k); return f ? Tx(f[1]) : k; };
 
 /* ---------------- Team sync: phones share records through the server whenever there is signal ---------------- */
-type Team = { code: string; name: string; cursor: number; at: string };
+type Team = { code: string; name: string; cursor: number; at: string; itemsCursor?: number };
+// Issues and indicators travel whole (they are few); tombstones carry deletions; the server keeps the newest edit.
+const localItems = (): Item[] => [
+  ...read<Issue[]>("jlc-mel-issues", SAMPLE_ISSUES).filter((i) => !isSampleIssue(i.id)).map((i) => ({ kind: "issue" as const, id: i.id, ts: i.ts ?? "", data: i })),
+  ...read<Indicator[]>("jlc-mel-ind", DEFAULT_INDICATORS).map((i) => ({ kind: "indicator" as const, id: i.id, ts: i.ts ?? "", data: i })),
+  ...(["issue", "indicator"] as const).flatMap((kind) => read<Tomb[]>(`jlc-mel-tomb-${kind}`, []).map((t) => ({ kind, id: t.id, ts: t.ts, deleted: true }))),
+].slice(0, 500);
+function takeItems(incoming: Item[]) {
+  for (const [kind, key, init] of [["issue", "jlc-mel-issues", SAMPLE_ISSUES], ["indicator", "jlc-mel-ind", DEFAULT_INDICATORS]] as const) {
+    const mine = incoming.filter((i) => i.kind === kind);
+    if (!mine.length) continue;
+    const r = applyItems<{ id: string; ts?: string }>(read(key, init as { id: string }[]), read(`jlc-mel-tomb-${kind}`, []), mine);
+    write(key, r.list); write(`jlc-mel-tomb-${kind}`, r.tombs);
+  }
+}
 const melApi = async (body: unknown) => {
   const r = await fetch("/api/mel", { method: "POST", headers: { "content-type": "application/json", "x-ky": "1" }, body: JSON.stringify(body) });
   const data = await r.json().catch(() => ({}));
@@ -46,7 +74,7 @@ const melApi = async (body: unknown) => {
   return data;
 };
 let running = false; // one sync at a time per page
-function useSync(setRecs: (r: Rec[]) => void) {
+function useSync(reload: () => void) {
   const [team, setTeamState] = useState<Team | null>(() => read("jlc-mel-team", null));
   const [state, setState] = useState<"idle" | "busy" | "error">("idle"), [err, setErr] = useState("");
   const setTeam = (t: Team | null) => {
@@ -58,18 +86,20 @@ function useSync(setRecs: (r: Rec[]) => void) {
     if (!t || running || !navigator.onLine) return;
     running = true; setState("busy"); setErr("");
     try {
-      let cursor = t.cursor, more = true, name = t.name;
+      let cursor = t.cursor, itemsCursor = t.itemsCursor ?? 0, more = true, name = t.name, first = true;
       while (more) {
         const recs = read<Rec[]>("jlc-mel-recs", []), done = new Set(read<string[]>("jlc-mel-synced", []));
         const todo = recs.filter((r) => !done.has(r.id)).slice(0, 2000);
-        const res = await melApi({ op: "sync", code: t.code, records: todo, since: cursor });
+        const res = await melApi({ op: "sync", code: t.code, records: todo, since: cursor, items: first ? localItems() : [], itemsSince: itemsCursor });
         const merged = merge(recs, res.records ?? []);
         for (const r of [...todo, ...(res.records ?? [])]) done.add(r.id);
-        write("jlc-mel-recs", merged.all); write("jlc-mel-synced", [...done]); setRecs(merged.all);
-        cursor = res.cursor; name = res.team || name;
+        write("jlc-mel-recs", merged.all); write("jlc-mel-synced", [...done]);
+        takeItems(res.items ?? []);
+        reload();
+        cursor = res.cursor; itemsCursor = res.itemsCursor ?? itemsCursor; name = res.team || name; first = false;
         more = !!res.more || todo.length === 2000;
       }
-      setTeam({ ...t, name, cursor, at: new Date().toISOString() }); setState("idle");
+      setTeam({ ...t, name, cursor, itemsCursor, at: new Date().toISOString() }); setState("idle");
     } catch (e: any) {
       setState("error");
       setErr(e?.status === 403 ? "unknown_team" : e?.status === 503 ? "not_configured" : e?.status ? "server" : "network");
@@ -96,7 +126,7 @@ function SyncPanel({ sync }: { sync: ReturnType<typeof useSync> }) {
   };
   if (!sync.team) return <section className="card stack-sm">
     <h2>{L("Usawazishaji wa timu", "Team sync")}</h2>
-    <p className="small">{L("Unganisha simu za timu ili rekodi zifike kwa kila mtu na kwenye dashibodi moja, kila mtandao unapopatikana.", "Link the team's phones so records reach everyone and one shared dashboard whenever there is signal.")}</p>
+    <p className="small">{L("Unganisha simu za timu ili rekodi, masuala ya utetezi na viashiria vifike kwa kila mtu na kwenye dashibodi moja, kila mtandao unapopatikana.", "Link the team's phones so records, advocacy issues and indicators reach everyone and one shared dashboard whenever there is signal.")}</p>
     <label>{L("Jiunge na timu: weka nambari ya timu", "Join a team: enter the team code")}<input value={code} placeholder="JLC-XXXX-XXXX-XXXX-XXXX" autoCapitalize="characters" onChange={(e) => setCode(e.target.value.toUpperCase())} /></label>
     <button className="btn" disabled={!online || busy || !/^JLC(-[A-Z2-7]{4}){4}$/.test(code.trim())} onClick={async () => { const t = { code: code.trim(), name: "", cursor: 0, at: "" }; sync.setTeam(t); }}>{L("Jiunge", "Join")}</button>
     <details><summary className="small"><b>{L("Mratibu? Unda timu mpya", "Coordinator? Create a new team")}</b></summary>
@@ -134,7 +164,7 @@ function Spark({ data, color }: { data: number[]; color: string }) {
 export function Dashboard({ open }: { open: (t: string) => void }) {
   const L = useL(), Tx = useT();
   const m = useMel();
-  const sync = useSync(m.setRecs); // the dashboard pulls the team's latest records whenever it is open with signal
+  const sync = useSync(m.reload); // the dashboard pulls the team's latest records whenever it is open with signal
   const villages = [...new Set(m.all.map((r) => r.village).filter(Boolean))].sort();
   const [village, setVillage] = useState("");
   const recs = village ? m.all.filter((r) => r.village === village) : m.all;
@@ -213,7 +243,7 @@ function Input({ f, value, set }: { f: Field; value: string; set: (v: string) =>
 export function Collect() {
   const L = useL(), Tx = useT();
   const m = useMel(), online = useOnline();
-  const sync = useSync(m.setRecs);
+  const sync = useSync(m.reload);
   const [kind, setKind] = useState<Kind>("payout");
   const today = new Date().toISOString().slice(0, 10);
   const [base, setBase] = useState(() => read("jlc-mel-who", { village: "", collector: "" }));
@@ -285,6 +315,7 @@ const blankInd = (): Indicator => ({ id: "", pillar: "money", metric: "paid", na
 export function Indicators() {
   const L = useL(), Tx = useT();
   const m = useMel();
+  useSync(m.reload); // team indicators stay in step while this page is open
   const [d, setD] = useState<Indicator>(blankInd);
   const draft = { ...d, pillar: METRICS[d.metric].pillar, name: { sw: d.name.en, en: d.name.en } };
   const s = smart(draft);
@@ -295,8 +326,8 @@ export function Indicators() {
       <p className="muted small">{L("Kila kiashiria ni SMART: Mahususi, Kinapimika, Kinawezekana, Kinahusika, na kina Muda. Thamani ya sasa inahesabiwa moja kwa moja kutoka rekodi za ardhini.", "Every indicator is SMART: Specific, Measurable, Achievable, Relevant and Time-bound. The current value is computed straight from ground records.")}</p>
       <div className="table"><table><thead><tr><th>SMART</th><th>{L("Kiashiria", "Indicator")}</th><th>{L("Msingi", "Baseline")}</th><th>{L("Sasa", "Now")}</th><th>{L("Lengo", "Target")}</th><th>{L("Chanzo / mara ngapi", "Source / how often")}</th><th>{L("Mhusika", "Owner")}</th><th /></tr></thead>
         <tbody>{m.indicators.map((i) => { const val = metric(i.metric, m.all, m.issues); const u = METRICS[i.metric].unit; return <tr key={i.id}><td><Letters x={smart(i)} /></td><td style={{ minWidth: 260 }}>{Tx(i.name)}<small className="block muted">{Tx(METRICS[i.metric].name)}</small></td><td>{fmt(i.baseline, u)}</td><td><b>{fmt(val, u)}</b><small className="block muted">{progress(i, val)}%</small></td><td>{fmt(i.target, u)}<small className="block muted">{i.due}</small></td><td className="small">{Tx(i.source)} · {Tx(i.frequency)}</td><td className="small">{i.owner}</td>
-          <td><button className="icon" aria-label={L("Futa kiashiria", "Delete indicator")} onClick={() => { if (confirm(L("Futa kiashiria hiki?", "Delete this indicator?"))) m.setIndicators(m.indicators.filter((x) => x.id !== i.id)); }}><Trash2 size={15} aria-hidden /></button></td></tr>; })}</tbody></table></div>
-      <button className="btn ghost small" onClick={() => m.setIndicators(DEFAULT_INDICATORS)}>{L("Rudisha viashiria vya msingi", "Restore default indicators")}</button>
+          <td><button className="icon" aria-label={L("Futa kiashiria", "Delete indicator")} onClick={() => { if (confirm(L("Futa kiashiria hiki?", "Delete this indicator?"))) m.deleteIndicator(i.id); }}><Trash2 size={15} aria-hidden /></button></td></tr>; })}</tbody></table></div>
+      <button className="btn ghost small" onClick={m.addDefaults}>{L("Ongeza tena viashiria vya msingi vilivyokosekana", "Add back missing default indicators")}</button>
     </section>
     <section className="card">
       <h2>{L("Ongeza kiashiria SMART", "Add a SMART indicator")} <Letters x={s} /></h2>
@@ -314,7 +345,7 @@ export function Indicators() {
         {!s.A && <li>• A: {L("Weka mhusika; asilimia iwe kati ya 0 na 100.", "Name an owner; percentages must be 0-100.")}</li>}
         {!s.T && <li>• T: {L("Weka tarehe ya baadaye, na namba ndani ya kiashiria.", "Set a future date, and put a number in the indicator.")}</li>}
       </ul>
-      <button className="btn" disabled={!Object.values(s).every(Boolean)} onClick={() => { m.setIndicators([...m.indicators, { ...draft, id: `i${Date.now().toString(36)}`, source: KINDS_SOURCE(d.metric), frequency: { sw: "Kila robo", en: "Quarterly" } }]); setD(blankInd()); }}><Plus size={16} aria-hidden /> {L("Ongeza", "Add")}</button>
+      <button className="btn" disabled={!Object.values(s).every(Boolean)} onClick={() => { m.saveIndicator({ ...draft, id: `i${Date.now().toString(36)}`, source: KINDS_SOURCE(d.metric), frequency: { sw: "Kila robo", en: "Quarterly" } }); setD(blankInd()); }}><Plus size={16} aria-hidden /> {L("Ongeza", "Add")}</button>
     </section>
   </div>;
 }
@@ -329,10 +360,11 @@ const blankIssue = (): Issue => ({ id: "", title: "", level: "cda", target: "", 
 export function Advocacy() {
   const L = useL(), Tx = useT();
   const m = useMel();
+  useSync(m.reload); // team advocacy stays in step while this page is open
   const [d, setD] = useState<Issue>(blankIssue);
   const [brief, setBrief] = useState<Issue | null>(null);
   const counts = stageCounts(m.issues);
-  const move = (i: Issue, stage: number) => m.setIssues(m.issues.map((x) => (x.id === i.id ? { ...x, stage, updated: new Date().toISOString().slice(0, 10), log: [...x.log, { date: new Date().toISOString().slice(0, 10), stage, note: "" }] } : x)));
+  const move = (i: Issue, stage: number) => m.saveIssue({ ...i, stage, updated: new Date().toISOString().slice(0, 10), log: [...i.log, { date: new Date().toISOString().slice(0, 10), stage, note: "" }] });
   if (brief) return <PolicyBrief issue={brief} onBack={() => setBrief(null)} />;
   return <div className="stack">
     <div className="kpis">
@@ -349,9 +381,9 @@ export function Advocacy() {
       <p className="small"><b>{L("Ombi", "Ask")}:</b> {i.ask} · <b>{L("Mlengwa", "Target")}:</b> {i.target}</p>
       <div className="stages">{STAGES.map((s, n) => <button key={s.en} aria-pressed={i.stage === n} data-done={n <= i.stage} title={Tx(s)} onClick={() => move(i, n)}>{n + 1}</button>)}<small className="muted">{Tx(STAGES[i.stage])}</small></div>
       <p className="small"><b>{L("Ushahidi", "Evidence")}:</b> {i.evidence.map((e) => m.indicators.find((x) => x.id === e)).filter(Boolean).map((x) => `${Tx(METRICS[x!.metric].name)} = ${fmt(metric(x!.metric, m.all, m.issues), METRICS[x!.metric].unit)}`).join(" · ") || "—"}</p>
-      <label className="small">{L("Hatua inayofuata", "Next step")}<input value={i.next} maxLength={160} onChange={(e) => m.setIssues(m.issues.map((x) => (x.id === i.id ? { ...x, next: e.target.value } : x)))} /></label>
+      <label className="small">{L("Hatua inayofuata", "Next step")}<input value={i.next} maxLength={160} onChange={(e) => m.saveIssue({ ...i, next: e.target.value })} /></label>
       <div className="row"><button className="btn ghost small" onClick={() => setBrief(i)}><FileText size={15} aria-hidden /> {L("Muhtasari wa sera", "Policy brief")}</button>
-        <button className="icon" aria-label={L("Futa suala", "Delete issue")} onClick={() => { if (confirm(L("Futa suala hili?", "Delete this issue?"))) m.setIssues(m.issues.filter((x) => x.id !== i.id)); }}><Trash2 size={15} aria-hidden /></button></div>
+        <button className="icon" aria-label={L("Futa suala", "Delete issue")} onClick={() => { if (confirm(L("Futa suala hili?", "Delete this issue?"))) m.deleteIssue(i.id); }}><Trash2 size={15} aria-hidden /></button></div>
     </section>)}
     <section className="card">
       <h2>{L("Suala jipya la utetezi", "New advocacy issue")}</h2>
@@ -363,7 +395,7 @@ export function Advocacy() {
       </div>
       <p className="small"><b>{L("Ushahidi kutoka viashiria", "Evidence from indicators")}</b></p>
       <div className="chips wrap">{m.indicators.map((x) => <button key={x.id} aria-pressed={d.evidence.includes(x.id)} onClick={() => setD({ ...d, evidence: d.evidence.includes(x.id) ? d.evidence.filter((e) => e !== x.id) : [...d.evidence, x.id] })}>{Tx(METRICS[x.metric].name)}</button>)}</div>
-      <button className="btn" disabled={!d.title.trim() || !d.ask.trim()} onClick={() => { m.setIssues([...m.issues, { ...d, id: `a${Date.now().toString(36)}` }]); setD(blankIssue()); }}><Plus size={16} aria-hidden /> {L("Ongeza suala", "Add issue")}</button>
+      <button className="btn" disabled={!d.title.trim() || !d.ask.trim()} onClick={() => { m.saveIssue({ ...d, id: `a${Date.now().toString(36)}` }); setD(blankIssue()); }}><Plus size={16} aria-hidden /> {L("Ongeza suala", "Add issue")}</button>
     </section>
   </div>;
 }
