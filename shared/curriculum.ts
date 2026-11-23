@@ -98,6 +98,14 @@ const BASE_MODULES: Module[] = [
 ];
 export const MODULES: Module[] = [...BASE_MODULES, ...IK_MODULES];
 
+// The extra things the guide says in a richer lesson. Shared so the app and the audio recorder use identical words.
+export const extraBeats = (m: Module, lang: "sw" | "en"): string[] => [
+  ...(m.examples ?? []).map((e) => `${lang === "sw" ? "Mfano mwingine" : "Another example"}: ${e[lang]}`),
+  ...(m.words?.length ? [`${lang === "sw" ? "Maneno ya jamii" : "Community words"}:\n${m.words.map((w) => `• ${w.term} · ${w.lang}: ${w.meaning[lang]}`).join("\n")}`] : []),
+  ...(m.carbon ? [`🌱 ${m.carbon[lang]}`] : []),
+  ...(m.keepers ? [`🤝 ${m.keepers[lang]}`] : []),
+];
+
 // Short, sourced answers: the bot's offline brain and the context handed to the model.
 // Pillar cards (shared/pillar-cards.ts) also name the Impact tab to open, the seat that leads, their own points and follow-ups.
 export type Card = { id: string; theme: Theme; words: string[]; simple: T; detail: T; analogy: T; source: string; tool?: string; lead?: string; takes?: [string, T][]; follow?: T[] };

@@ -4,7 +4,8 @@ import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import { intakeDone, intakeQuestion, offlineAnswer } from "../shared/answers.js";
 import { REACTIONS, audioKey, segments } from "../shared/audio-key.js";
 import { INTAKE, SCENES, type Audience, type Lang } from "../shared/content.js";
-import { CARDS, MODULES } from "../shared/curriculum.js";
+import { CARDS, MODULES, extraBeats } from "../shared/curriculum.js";
+import { TOOL_NAMES } from "../shared/pillar-cards.js";
 import { FINALE, STORY, WELCOME } from "../shared/story.js";
 import { DONE, FOOT, GAME, INVITE, LEAD_IN, NO_CARD, OPENERS, REACT, TAKES } from "../shared/council.js";
 
@@ -14,7 +15,9 @@ function lines(lang: Lang) {
   const u = { lang, audience: "herder" as Audience, intake_step: 5 };
   const all: string[] = [WELCOME[lang], FINALE[lang], intakeDone[lang], ...REACTIONS.filter((r) => /Exactly|Not quite/.test(r) === (lang === "en"))];
   for (const s of Object.values(STORY)) all.push(s.open[lang], s.ask[lang], s.close[lang]);
-  for (const m of MODULES) all.push(...m.points.map((p) => p[lang]), m.activity[lang], ...m.quiz.flatMap((q) => [q.q[lang], q.why[lang]]));
+  for (const m of MODULES) all.push(...m.points.map((p) => p[lang]), ...extraBeats(m, lang), m.activity[lang], ...m.quiz.flatMap((q) => [q.q[lang], q.why[lang]]));
+  // The pointer at the end of a pillar answer in chat.
+  for (const t of Object.values(TOOL_NAMES)) all.push(lang === "sw" ? `Ijaribu kwa hali yenu: kwenye programu fungua Athari, kisha "${t.sw}".` : `Try it for your own situation: in the app open Impact, then "${t.en}".`);
   for (const c of CARDS) all.push(c.simple[lang], c.detail[lang], c.analogy[lang], offlineAnswer(c.words[0], u, "game").body);
   all.push(offlineAnswer("zzz", u, "ask").body);
   INTAKE.forEach((_, i) => all.push(intakeQuestion({ ...u, intake_step: i })!));
@@ -28,7 +31,9 @@ async function record(text: string, voice: string, path: string) {
     const tts = new MsEdgeTTS();
     try {
       await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
-      const { audioStream } = tts.toStream(text, { rate: "-8%" });
+      // Emoji and bullets are for the eye; the clip keeps the key of the full text but the voice never reads them.
+      const spoken = text.replace(/\p{Extended_Pictographic}/gu, "").replace(/[•·]/g, ",").replace(/\s+,/g, ",").trim();
+      const { audioStream } = tts.toStream(spoken, { rate: "-8%" });
       const chunks: Buffer[] = [];
       await new Promise((res, rej) => { audioStream.on("data", (d: Buffer) => chunks.push(d)); audioStream.on("end", res as () => void); audioStream.on("error", rej); });
       if (chunks.length) { fs.writeFileSync(path, Buffer.concat(chunks)); return; }

@@ -1,7 +1,7 @@
 import { ArrowLeft, Check, CircleHelp, Footprints, Send } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Module } from "../shared/curriculum";
-import { MODULES } from "../shared/curriculum";
+import { MODULES, extraBeats } from "../shared/curriculum";
 import { FINALE, GUIDE, STORY } from "../shared/story";
 import { WorkBox } from "./assignments";
 import { Listen, audioOn, play, stop } from "./audio";
@@ -49,10 +49,7 @@ export function Lesson({ m, doneBefore, onDone }: { m: Module; doneBefore: numbe
   const beats = useMemo<Beat[]>(() => [
     { kind: "say", text: T(place.open) }, ...m.points.map((p, i) => ({ kind: "say" as const, text: T(p), pic: i === 0 ? m.id : undefined })),
     // Richer lessons: more examples, local words, the link to carbon, and who holds the knowledge.
-    ...(m.examples ?? []).map((e) => ({ kind: "say" as const, text: `${L("Mfano mwingine", "Another example")}: ${T(e)}` })),
-    ...(m.words?.length ? [{ kind: "say" as const, text: `${L("Maneno ya jamii", "Community words")}:\n${m.words.map((w) => `• ${w.term} · ${w.lang}: ${T(w.meaning)}`).join("\n")}` }] : []),
-    ...(m.carbon ? [{ kind: "say" as const, text: `🌱 ${T(m.carbon)}` }] : []),
-    ...(m.keepers ? [{ kind: "say" as const, text: `🤝 ${T(m.keepers)}` }] : []),
+    ...extraBeats(m, lang).map((text) => ({ kind: "say" as const, text })),
     { kind: "ask", text: T(place.ask) }, ...m.quiz.map((_, i) => ({ kind: "quiz" as const, i })), { kind: "end" },
   ], [m, lang]);
   const [log, setLog] = useState<Line[]>([]), [at, setAt] = useState(-1), [typing, setTyping] = useState(true);
