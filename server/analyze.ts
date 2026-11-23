@@ -11,6 +11,7 @@ const THEME_WORDS: Record<Theme, string[]> = {
   benefits: ["pesa", "money", "mapato", "earning", "mgao", "share", "faida", "malipo", "payment", "asilimia"],
   contracts: ["mkataba", "contract", "kusaini", "sign", "sheria", "law", "wakili", "lawyer", "kiingereza"],
   ai_trust: [" ai ", "akili bandia", "chatbot", "roboti", "faragha", "privacy"],
+  indigenous: ["asili", "indigenous", "mila", "olopololi", "kaya", "mti mtakatifu", "sacred", "urejeshaji", "restor", "hekima", "wisdom", "ogiek", "endorois"],
 };
 const CONCERN = ["wasiwasi", "hofu", "ogopa", "worry", "afraid", "fear", "dhuluma", "tapeli", "cheat", "kuibiwa", "kufukuzwa", "evict", "hatuelewi", "sielewi", "don't understand", "uongo"];
 const KNOWLEDGE = ["jadi", "tradition", "wazee", "elders", "zamani", "desturi", "custom", "tunajua", "we know", "mababu"];

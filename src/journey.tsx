@@ -48,6 +48,11 @@ export function Lesson({ m, doneBefore, onDone }: { m: Module; doneBefore: numbe
   const place = STORY[m.id];
   const beats = useMemo<Beat[]>(() => [
     { kind: "say", text: T(place.open) }, ...m.points.map((p, i) => ({ kind: "say" as const, text: T(p), pic: i === 0 ? m.id : undefined })),
+    // Richer lessons: more examples, local words, the link to carbon, and who holds the knowledge.
+    ...(m.examples ?? []).map((e) => ({ kind: "say" as const, text: `${L("Mfano mwingine", "Another example")}: ${T(e)}` })),
+    ...(m.words?.length ? [{ kind: "say" as const, text: `${L("Maneno ya jamii", "Community words")}:\n${m.words.map((w) => `• ${w.term} · ${w.lang}: ${T(w.meaning)}`).join("\n")}` }] : []),
+    ...(m.carbon ? [{ kind: "say" as const, text: `🌱 ${T(m.carbon)}` }] : []),
+    ...(m.keepers ? [{ kind: "say" as const, text: `🤝 ${T(m.keepers)}` }] : []),
     { kind: "ask", text: T(place.ask) }, ...m.quiz.map((_, i) => ({ kind: "quiz" as const, i })), { kind: "end" },
   ], [m, lang]);
   const [log, setLog] = useState<Line[]>([]), [at, setAt] = useState(-1), [typing, setTyping] = useState(true);
@@ -152,6 +157,10 @@ export function Lesson({ m, doneBefore, onDone }: { m: Module; doneBefore: numbe
             <p className="muted small">{L("Alama", "Score")}: {score}%</p>
             <div className="safety"><b>{L("Kazi yako", "Your assignment")}: </b>{T(m.activity)}</div>
             <WorkBox moduleId={m.id} />
+            {m.sources && <details className="sources"><summary>{L("Vyanzo vya somo hili", "Sources for this lesson")}</summary>
+              <ul className="plain small">{m.sources.map(([name, url]) => <li key={url}><a href={url} target="_blank" rel="noopener noreferrer">{name}</a></li>)}</ul>
+              <p className="muted small">{L("Maneno ya lugha za jamii yameandikwa kama vyanzo vinavyoandika; lahaja hutofautiana. Wanajamii wanaweza kurekebisha.", "Community-language words are spelled as the sources spell them; dialects differ. Community members can correct them.")}</p>
+            </details>}
             {grown >= MODULES.length && <p className="note">{T(FINALE)}</p>}
             <button className="btn" onClick={onDone}>{L("Rudi safarini", "Back to the journey")}</button>
           </div>}

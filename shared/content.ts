@@ -4,7 +4,7 @@ export type T = { sw: string; en: string };
 export type Audience = "leader" | "herder" | "student" | "elder" | "trainer";
 export type Theme =
   | "carbon_basics" | "ecology" | "measurement" | "land_rights"
-  | "fpic" | "benefits" | "contracts" | "ai_trust";
+  | "fpic" | "benefits" | "contracts" | "ai_trust" | "indigenous";
 
 export const o = (sw: string, en: string): T => ({ sw, en });
 
@@ -17,6 +17,7 @@ export const THEMES: Record<Theme, T> = {
   benefits: o("Mgao wa mapato", "Benefit sharing"),
   contracts: o("Mikataba", "Contracts"),
   ai_trust: o("Kuamini AI kwa busara", "Trusting AI wisely"),
+  indigenous: o("Maarifa asilia: uhifadhi na urejeshaji", "Indigenous knowledge: conservation and restoration"),
 };
 
 export const AUDIENCES: Record<Audience, T> = {

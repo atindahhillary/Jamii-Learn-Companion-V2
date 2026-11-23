@@ -1,11 +1,12 @@
 import { o, type T } from "./content.js";
+import { IK_STORY } from "./indigenous.js";
 
 // The journey: one fictional village, one stop per module. Each stop stands alone because the order follows community gaps.
 export const GUIDE = "Mzee Sironka";
 export const VILLAGE = "Enkare";
 export type Stop = { place: T; open: T; ask: T; close: T };
 
-export const STORY: Record<string, Stop> = {
+const BASE_STORY: Record<string, Stop> = {
   m1: {
     place: o("Kisimani", "At the well"),
     open: o("Karibu, rafiki. Ni asubuhi hapa kijijini Enkare. Gari geni limefika kisimani, na mgeni anasema atalipa kwa 'hewa safi'. Wanawake wananitazama: Mzee, hewa inauzwaje? Tembea nami, tujue.", "Welcome, friend. It is morning in Enkare village. A strange car has stopped at the well, and the visitor says he will pay for 'clean air'. The women look at me: Elder, how is air sold? Walk with me and let us find out."),
@@ -55,6 +56,7 @@ export const STORY: Record<string, Stop> = {
     close: o("Nimefurahi. Unaweza kunitumia, lakini maamuzi ni yenu daima.", "I am glad. You may use me, but the decisions are always yours."),
   },
 };
+export const STORY: Record<string, Stop> = { ...BASE_STORY, ...IK_STORY };
 
 export const WELCOME = o(
   "Karibu, rafiki. Mimi ni Mzee Sironka, kiongozi wako wa safari. Mimi ni AI, si mzee halisi. Kabla ya kutembea, nataka kukusikiliza.",

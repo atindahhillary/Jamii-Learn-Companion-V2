@@ -19,6 +19,10 @@ The **Impact** page (`src/impact.tsx`, logic in `shared/impact.ts`, tests in `te
 
 All example numbers are made up. In the demo everything is saved on the device only.
 
+## V2: Indigenous knowledge of conservation and restoration
+
+A new topic, "Indigenous knowledge: conservation and restoration", adds four lessons (`shared/indigenous.ts`, tests in `tests/indigenous.test.ts`): resting pasture (Maasai olopololi and ololili, Borana dheeda, tula and Gada), sacred trees and forests (Mijikenda Kaya forests, Turkana ekwar, Maasai oreteti), reading the land, water and sky (Borana weather indicators, Marakwet furrows), and knowledge and land rights (Ogiek and Endorois rulings, Kenya's Act No. 33 of 2016, the Nagoya Protocol, and the debate over the Northern Kenya Rangelands Carbon Project). Each lesson also gives examples, community words, the link to carbon, who holds the knowledge, a consent-respecting home activity, a quiz and its sources. Facts were checked against the listed sources in November 2026. The chat answers these topics with the knowledge keeper leading, plans include all four lessons, and WhatsApp lists lessons in pages of nine. Spellings follow the sources; dialects differ, and the content still needs review by the communities named and by native Kiswahili speakers.
+
 ## V2: impact dashboard and MEL tools
 
 After the landing page the app opens on **Impact**, whose first tab is the **impact dashboard** (`src/mel.tsx`, logic in `shared/mel.ts`, tests in `tests/mel.test.ts`): six KPI cards with change against last quarter and sparklines, a monthly trend, payout use and recipient donuts, people reached by audience, practices in use, SMART goal progress, key insights and the advocacy funnel. Filter by village.

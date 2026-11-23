@@ -351,7 +351,7 @@ describe("plans, groups and games", () => {
     expect(p[2].reason.en).toContain("own words");
     expect(p.at(-1)!.week).toBeGreaterThan(1);
     expect(p.every((x) => x.guide === null)).toBe(true);
-    expect(makePlan({ forWhom: "me", themes: [], level: "some", minutes: 20, note: "" })).toHaveLength(8);
+    expect(makePlan({ forWhom: "me", themes: [], level: "some", minutes: 20, note: "" })).toHaveLength(MODULES.length);
   });
   it("grows a group's needs from facilitator notes and gives a guide per session", async () => {
     const { cleanGroup, groupNeeds, groupPlan } = await import("../shared/plan.js");
@@ -515,7 +515,8 @@ describe("WhatsApp bot for the public demo", () => {
       expect(shown(out()[1])).toContain("Benefit sharing");
       expect(out()[1].body.interactive.action.buttons[0].reply.id).toBe("en|lesson|7");
       await deliver("m3", "somo");
-      expect(out()[2].body.interactive.action.sections[0].rows).toHaveLength(8);
+      expect(out()[2].body.interactive.action.sections[0].rows).toHaveLength(10); // 9 lessons + "more lessons"
+      expect(out()[2].body.interactive.action.sections[0].rows.every((r: any) => r.title.length <= 24)).toBe(true);
       await deliver("m4", "Should we sign the contract?");
       expect(shown(out()[3])).toMatch(/cannot tell you to sign|not for an AI/);
       // Tapping a suggested question answers it, in the language carried by the button.

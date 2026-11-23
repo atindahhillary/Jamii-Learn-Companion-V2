@@ -52,8 +52,8 @@ export function makePlan(goal: Goal, gaps: { moduleId: string; gap: number }[] =
 
   const weekly = Math.max(10, goal.minutes || 20);
   let used = 0;
-  return [...reasons.entries()].map(([theme, reason], i) => {
-    const m = MODULES.find((x) => x.theme === theme)!;
+  // A topic can hold several lessons (Indigenous knowledge has four); all of them join the plan in order.
+  return [...reasons.entries()].flatMap(([theme, reason]) => MODULES.filter((x) => x.theme === theme).map((m) => ({ m, theme, reason }))).map(({ m, theme, reason }, i) => {
     // A group needs time to talk, and deeper learners get the detailed reading.
     const minutes = m.minutes + (goal.forWhom === "group" ? 15 : 0) + (goal.level === "deep" ? 5 : 0);
     const week = Math.floor(used / weekly) + 1;

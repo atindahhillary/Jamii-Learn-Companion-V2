@@ -58,14 +58,23 @@ function lesson(L: Lang, n: number): Out {
   if (!m) return lessonList(L);
   const next = MODULES[n] ? [{ id: id(L, "lesson", n + 1), title: t2(L, "Somo lijalo ▶", "Next lesson ▶") }] : [];
   return {
-    text: `📚 *${t2(L, "Somo", "Lesson")} ${n}: ${m.title[L]}*\n_${m.minutes} ${t2(L, "dakika", "min")}_\n\n${m.points.map((p) => `✅ ${p[L]}`).join("\n\n")}\n\n🎯 *${t2(L, "Jaribu leo", "Try today")}:* ${m.activity[L]}`,
+    text: `📚 *${t2(L, "Somo", "Lesson")} ${n}: ${m.title[L]}*\n_${m.minutes} ${t2(L, "dakika", "min")}_\n\n${m.points.map((p) => `✅ ${p[L]}`).join("\n\n")}${m.carbon ? `\n\n🌱 ${m.carbon[L]}` : ""}\n\n🎯 *${t2(L, "Jaribu leo", "Try today")}:* ${m.activity[L]}`,
     buttons: [...next, { id: id(L, "faq"), title: t2(L, "❓ Uliza swali", "❓ Ask a question") }, { id: id(L, "menu"), title: t2(L, "🏠 Menyu", "🏠 Menu") }],
   };
 }
-const lessonList = (L: Lang): Out => ({
-  text: t2(L, "📚 *Masomo 8 mafupi* (dakika 5 hadi 7 kila moja). Chagua moja:", "📚 *8 short lessons* (5 to 7 minutes each). Pick one:"),
-  list: { button: t2(L, "Chagua somo", "Choose a lesson"), rows: MODULES.map((m, i) => ({ id: id(L, "lesson", i + 1), title: `${i + 1}. ${m.title[L]}`, description: `${m.minutes} ${t2(L, "dakika", "min")}` })) },
-});
+// WhatsApp lists hold 10 rows and 24-character titles, so lessons come in pages of 9 with a "more" row.
+const PAGE = 9;
+const lessonList = (L: Lang, page = 1): Out => {
+  const start = (page - 1) * PAGE, more = MODULES.length > start + PAGE;
+  const rows = MODULES.slice(start, start + PAGE).map((m, i) => {
+    const n = start + i + 1, full = `${n}. ${m.title[L]}`;
+    return { id: id(L, "lesson", n), title: full.length > 24 ? `${full.slice(0, 23)}…` : full, description: `${m.title[L]} · ${m.minutes} ${t2(L, "dakika", "min")}`.slice(0, 72) };
+  });
+  return {
+    text: t2(L, `📚 *Masomo ${MODULES.length} mafupi* (dakika 5 hadi 8 kila moja). Chagua moja:`, `📚 *${MODULES.length} short lessons* (5 to 8 minutes each). Pick one:`),
+    list: { button: t2(L, "Chagua somo", "Choose a lesson"), rows: more ? [...rows, { id: id(L, "lessons", page + 1), title: t2(L, "Masomo zaidi ▶", "More lessons ▶"), description: "" }] : rows },
+  };
+};
 const faq = (L: Lang): Out => ({
   text: t2(L, "❓ *Maswali ambayo jamii huuliza zaidi.* Gusa moja, au andika lako:", "❓ *What communities ask most.* Tap one, or type your own:"),
   list: { button: t2(L, "Maswali", "Questions"), rows: askRows(L, [...new Set([...STARTERS, ...Object.values(FOLLOW).flat()].map((q) => q[L]))]) },
@@ -100,7 +109,7 @@ export function reply(raw: string): Out {
   if (tap) {
     const L = tap[1] as Lang, what = tap[2], arg = tap[3] ?? "";
     if (what === "lesson") return lesson(L, Number(arg));
-    if (what === "lessons") return lessonList(L);
+    if (what === "lessons") return lessonList(L, Number(arg) || 1);
     if (what === "faq") return faq(L);
     if (what === "games") return games(L);
     if (what === "ask") return answer(L, arg);
@@ -110,7 +119,7 @@ export function reply(raw: string): Out {
   if (/^(menu|menyu|msaada|help|anza|start|hi|hello|hey|habari|jambo|sopa|mambo|niaje|salaam)$/.test(t)) return menu(L);
   if (/^(acha|stop)$/.test(t)) return { text: t2(L, "Sawa 👍 Sitakutumia ujumbe. Ukitaka kuendelea, andika *menyu* wakati wowote.", "Okay 👍 I will not message you. To carry on, send *menu* any time.") };
   if (/^(asante|thanks|thank you|ashe)$/.test(t)) return { text: t2(L, "Karibu sana! 🙏 Niko hapa ukiwa na swali jingine.", "You are very welcome! 🙏 I am here for your next question."), buttons: menuButtons(L) };
-  const l = t.match(/^(somo|lesson|masomo|lessons)\s*(\d)?$/);
+  const l = t.match(/^(somo|lesson|masomo|lessons)\s*(\d{1,2})?$/);
   if (l) return l[2] ? lesson(L, Number(l[2])) : lessonList(L);
   if (/^(michezo|mchezo|games|game)$/.test(t)) return games(L);
   if (/^(maa|maasai|kimaasai)$/.test(t)) return maa(L);

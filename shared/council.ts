@@ -7,8 +7,8 @@ import { INTAKE, o, routeExpert, type Audience, type Lang, type T, type Theme } 
 
 // Which seat leads each topic, and which lesson illustration goes with it.
 const MODULES_THEME_EXPERT: { expert: Record<Theme, string>; module: Record<Theme, string> } = {
-  expert: { carbon_basics: "kaboni", ecology: "malisho", measurement: "malisho", land_rights: "wakili", fpic: "wakili", benefits: "mchambuzi", contracts: "wakili", ai_trust: "mlinzi" },
-  module: { carbon_basics: "m1", ecology: "m2", measurement: "m3", land_rights: "m4", fpic: "m5", benefits: "m6", contracts: "m7", ai_trust: "m8" },
+  expert: { carbon_basics: "kaboni", ecology: "malisho", measurement: "malisho", land_rights: "wakili", fpic: "wakili", benefits: "mchambuzi", contracts: "wakili", ai_trust: "mlinzi", indigenous: "mzee" },
+  module: { carbon_basics: "m1", ecology: "m2", measurement: "m3", land_rights: "m4", fpic: "m5", benefits: "m6", contracts: "m7", ai_trust: "m8", indigenous: "m9" },
 };
 
 export type Mode = "ask" | "analogy" | "game";
@@ -30,6 +30,11 @@ export const OPENERS: Record<string, T[]> = {
 
 // What the other seats add, so a whole-council answer carries more than one point of view.
 export const TAKES: Record<Theme, [string, T][]> = {
+  indigenous: [
+    ["wakili", o("Sheria ya Kenya ya 2016 ya maarifa ya jadi inataka ridhaa ya jamii na mgao wa faida kabla maarifa hayajatumiwa.", "Kenya's 2016 traditional knowledge law requires community consent and benefit sharing before knowledge is used.")],
+    ["malisho", o("Kupumzisha nyasi husaidia udongo kushika kaboni, lakini ukame unaweza kurudisha faida hiyo nyuma.", "Resting grass helps soil hold carbon, but drought can reverse the gain.")],
+    ["mwalimu", o("Wanawake, vijana na wazee hushika sehemu tofauti za maarifa. Waulizeni wote.", "Women, youth and elders each hold different parts of the knowledge. Ask them all.")],
+  ],
   carbon_basics: [
     ["mchambuzi", o("Bei ya mkopo hubadilika sokoni, kwa hiyo usiamini ahadi ya bei isiyobadilika bila maandishi.", "The price of a credit changes on the market, so do not trust a fixed price promise unless it is written down.")],
     ["mzee", o("Kumbukeni: tunachouza ni ahadi ya kutunza ardhi, na ahadi hiyo inawafunga wajukuu pia.", "Remember: what we sell is a promise to care for the land, and that promise binds our grandchildren too.")],
@@ -88,6 +93,7 @@ export const GAME = o("Mchezo: gawanyeni vikundi viwili. Kimoja kitetee hoja hii
 
 // Suggested next questions; each one is worded to reach a card.
 export const FOLLOW: Record<Theme, T[]> = {
+  indigenous: [o("Jamii zilipumzishaje malisho zamani?", "How did communities rest pasture in the past?"), o("Misitu mitakatifu inalindaje kaboni?", "How do sacred forests protect carbon?"), o("Nani anamiliki maarifa ya jadi?", "Who owns traditional knowledge?")],
   carbon_basics: [o("Nani hununua mikopo ya kaboni?", "Who buys carbon credits?"), o("Mradi hudumu muda gani?", "How long does a project last?"), o("Mgao wa mapato ni asilimia ngapi?", "What share of earnings do we get?")],
   ecology: [o("Nini kinatokea wakati wa ukame?", "What happens in a drought?"), o("Kaboni hupimwaje?", "How is carbon measured?"), o("Maarifa ya jadi yalindwe vipi?", "How should traditional knowledge be protected?")],
   measurement: [o("Mradi hudumu muda gani?", "How long does a project last?"), o("Nani hununua mikopo ya kaboni?", "Who buys carbon credits?"), o("Ridhaa ya jamii ni nini?", "What is community consent?")],

@@ -1,10 +1,12 @@
 import { o, type T, type Theme } from "./content.js";
 import { PILLAR_CARDS } from "./pillar-cards.js";
+import { IK_CARDS, IK_MODULES } from "./indigenous.js";
 
 export type Q = { q: T; options: T[]; answer: number; why: T };
-export type Module = { id: string; theme: Theme; title: T; minutes: number; points: T[]; activity: T; quiz: Q[] };
+// Richer lessons (shared/indigenous.ts) add examples, local words, the carbon link, who holds the knowledge, and sources.
+export type Module = { id: string; theme: Theme; title: T; minutes: number; points: T[]; activity: T; quiz: Q[]; examples?: T[]; words?: { term: string; lang: string; meaning: T }[]; carbon?: T; keepers?: T; sources?: [string, string][] };
 
-export const MODULES: Module[] = [
+const BASE_MODULES: Module[] = [
   { id: "m1", theme: "carbon_basics", title: o("Mkopo wa kaboni ni nini?", "What is a carbon credit?"), minutes: 5,
     points: [
       o("Mkopo mmoja wa kaboni unawakilisha tani moja ya gesi ya ukaa iliyopunguzwa au kuondolewa hewani.", "One carbon credit represents one tonne of CO2 equivalent reduced or removed from the air."),
@@ -94,6 +96,7 @@ export const MODULES: Module[] = [
       { q: o("Ni nini hupaswi kuweka kwenye AI?", "What should you never type into an AI?"), options: [o("Swali kuhusu mvua", "A question about rain"), o("Neno 'kaboni'", "The word 'carbon'"), o("PIN na namba za kitambulisho", "PINs and ID numbers")], answer: 2, why: o("Data nyeti ikitoka, haiwezi kurudishwa kwa urahisi.", "Sensitive data, once out, is hard to take back.") },
     ] },
 ];
+export const MODULES: Module[] = [...BASE_MODULES, ...IK_MODULES];
 
 // Short, sourced answers: the bot's offline brain and the context handed to the model.
 // Pillar cards (shared/pillar-cards.ts) also name the Impact tab to open, the seat that leads, their own points and follow-ups.
@@ -166,4 +169,4 @@ const BASE_CARDS: Card[] = [
     source: "Fourth Schedule cl 9, 24" },
 ];
 // Pillar cards come last, so on an equal score the original topic answers still win.
-export const CARDS: Card[] = [...BASE_CARDS, ...PILLAR_CARDS];
+export const CARDS: Card[] = [...BASE_CARDS, ...IK_CARDS, ...PILLAR_CARDS];
