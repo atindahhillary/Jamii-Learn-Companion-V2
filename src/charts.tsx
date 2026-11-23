@@ -49,11 +49,11 @@ export function Donut({ parts, center, sub, label }: { parts: { name: string; va
   );
 }
 
-export const Bars = ({ rows }: { rows: { name: string; value: number; note?: string }[] }) => (
+export const Bars = ({ rows, suffix = "" }: { rows: { name: string; value: number; note?: string }[]; suffix?: string }) => (
   <ul className="bars">
     {rows.map((r) => (
       <li key={r.name}>
-        <span className="row-between"><span>{r.name}</span><b>{r.value}</b></span>
+        <span className="row-between"><span>{r.name}</span><b>{r.value}{suffix}</b></span>
         <span className="track" role="meter" aria-valuenow={r.value} aria-valuemin={0} aria-valuemax={100} aria-label={r.name}><span style={{ width: `${r.value}%` }} /></span>
         {r.note && <small className="muted">{r.note}</small>}
       </li>

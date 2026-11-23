@@ -19,6 +19,17 @@ The **Impact** page (`src/impact.tsx`, logic in `shared/impact.ts`, tests in `te
 
 All example numbers are made up. In the demo everything is saved on the device only.
 
+## V2: impact dashboard and MEL tools
+
+After the landing page the app opens on **Impact**, whose first tab is the **impact dashboard** (`src/mel.tsx`, logic in `shared/mel.ts`, tests in `tests/mel.test.ts`): six KPI cards with change against last quarter and sparklines, a monthly trend, payout use and recipient donuts, people reached by audience, practices in use, SMART goal progress, key insights and the advocacy funnel. Filter by village.
+
+- **Collect data** works with no network: five ground forms (household payout, household survey, land check, clever farming practice, training/outreach) save on the phone, keep people's own words, and use household codes instead of names. Phones share a JSON file (WhatsApp, Bluetooth, email) and the coordinator combines it; every record is validated and the same record never counts twice. CSV export for Excel.
+- **SMART indicators**: ten default indicators across the pillars, each with baseline, target, due date, source, frequency and owner, computed live from ground records; new ones are checked letter by letter (S, M, A, R, T).
+- **Policy advocacy**: issues tracked through seven stages from "issue identified" to "being implemented", linked to indicator evidence, with a printable one-page policy brief.
+- Sample data is fictional, generated in the browser, never saved, and can be switched off before reporting.
+
+Server sync is not built yet: until the database is switched on, phones combine data by file.
+
 ## Live demo
 
 The public site runs with `VITE_DEMO=1`: everything happens in the visitor's browser (`src/demo.ts`), with fictional sample data and prepared, sourced answers. No database, no accounts, no phone numbers, and what a visitor types stays on their device. Live AI and WhatsApp are off until the backend below is deployed. To go full stack, remove `.vercelignore`, change `buildCommand` back to `npm run build`, and add the `/api` rewrite.

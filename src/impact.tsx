@@ -1,4 +1,5 @@
-import { AlertTriangle, ArrowRight, Coins, Download, HeartHandshake, Layers, Plus, Route, Sprout, Trash2, TrendingUp, Wheat } from "lucide-react";
+import { AlertTriangle, ArrowRight, ClipboardList, Coins, Download, HeartHandshake, Layers, LayoutDashboard, Megaphone, Plus, Route, Sprout, Target, Trash2, TrendingUp, Wheat } from "lucide-react";
+import { Advocacy, Collect, Dashboard, Indicators } from "./mel";
 import { useEffect, useState } from "react";
 import type { T } from "../shared/content";
 import {
@@ -33,17 +34,35 @@ const HOSTS: Record<Tab, [string, T]> = {
   farming: ["dada", { sw: "Kilimo bora kinarudisha ardhi na kuongeza mapato. Chagua msimu uone cha kufanya.", en: "Clever farming restores land and adds income. Pick a season to see what to do." }],
 };
 
+// Impact opens on the dashboard; MEL tools sit beside it; the six pillar tools are one level down.
+const MAIN = ["dashboard", "collect", "indicators", "advocacy", "tools"] as const;
+type Main = (typeof MAIN)[number];
+const MAIN_ICONS: Record<Main, typeof Coins> = { dashboard: LayoutDashboard, collect: ClipboardList, indicators: Target, advocacy: Megaphone, tools: Layers };
+
 export function Impact() {
   const L = useL(), Tx = useT();
-  const fromHash = () => { const t = location.hash.split("/")[1] as Tab; return TABS.includes(t) ? t : "overview"; };
-  const [tab, setTab] = useState<Tab>(fromHash);
-  useEffect(() => { const f = () => setTab(fromHash()); addEventListener("hashchange", f); return () => removeEventListener("hashchange", f); }, []);
+  const seg = () => location.hash.split("/")[1] ?? "";
+  const mainOf = (s: string): Main => (TABS.includes(s as Tab) ? "tools" : MAIN.includes(s as Main) ? (s as Main) : "dashboard");
+  const tabOf = (s: string): Tab => (TABS.includes(s as Tab) ? (s as Tab) : "overview");
+  const [s, setS] = useState(seg);
+  useEffect(() => { const f = () => setS(seg()); addEventListener("hashchange", f); return () => removeEventListener("hashchange", f); }, []);
   const open = (t: string) => { location.hash = `impact/${t}`; window.scrollTo(0, 0); };
+  const main = mainOf(s), tab = tabOf(s);
   const [look, say] = HOSTS[tab];
+  const MAIN_NAMES: Record<Main, string> = { dashboard: L("Dashibodi", "Dashboard"), collect: L("Kusanya data", "Collect data"), indicators: L("Viashiria SMART", "SMART indicators"), advocacy: L("Utetezi wa sera", "Policy advocacy"), tools: L("Zana za nguzo", "Pillar tools") };
   return (
     <div className="page">
-      <h1>{L("Athari: kutoka maarifa hadi ustawi", "Impact: from knowledge to wellbeing")}</h1>
-      <div className="tabs" role="tablist" aria-label={L("Nguzo sita", "Six pillars")}>
+      <h1>{main === "dashboard" ? L("Dashibodi ya athari", "Impact dashboard") : L("Athari: kutoka maarifa hadi ustawi", "Impact: from knowledge to wellbeing")}</h1>
+      {main === "dashboard" && <p className="muted lead">{L("Pesa, kaya, ardhi, kilimo, maarifa na sera: kila nguzo kutoka data ya ardhini.", "Money, households, land, farming, knowledge and policy: every pillar, from ground data.")}</p>}
+      <div className="tabs" role="tablist" aria-label={L("Sehemu za athari", "Impact sections")}>
+        {MAIN.map((t) => { const I = MAIN_ICONS[t]; return <button key={t} role="tab" aria-selected={main === t} onClick={() => open(t === "tools" ? "overview" : t)}><I size={15} aria-hidden /> {MAIN_NAMES[t]}</button>; })}
+      </div>
+      {main === "dashboard" && <Dashboard open={open} />}
+      {main === "collect" && <Collect />}
+      {main === "indicators" && <Indicators />}
+      {main === "advocacy" && <Advocacy />}
+      {main === "tools" && <>
+      <div className="tabs sub" role="tablist" aria-label={L("Nguzo sita", "Six pillars")}>
         {TABS.map((t) => { const I = ICONS[t]; return <button key={t} role="tab" aria-selected={tab === t} onClick={() => open(t)}><I size={15} aria-hidden /> {Tx(TAB_NAMES[t])}</button>; })}
       </div>
       <div className="line-row guide lead"><Person look={look} size={52} /><div className="bubble"><p>{Tx(say)}</p><Listen text={Tx(say)} /></div></div>
@@ -54,7 +73,8 @@ export function Impact() {
       {tab === "pathways" && <Pathways open={open} />}
       {tab === "regen" && <Regen />}
       {tab === "farming" && <Farming />}
-      <p className="muted small note">{L("Namba zote ni mifano ya kubuni hadi uweke za mradi wenu. Hii si ushauri wa kifedha wala wa kisheria. Unachoandika kinabaki kwenye kifaa hiki.", "All numbers are made-up examples until you enter your project's. This is not financial or legal advice. What you enter stays on this device.")}</p>
+      </>}
+      <p className="muted small note">{L("Data ya mfano ni ya kubuni. Hii si ushauri wa kifedha wala wa kisheria. Unachoandika kinabaki kwenye kifaa hiki hadi ukishiriki faili.", "Sample data is fictional. This is not financial or legal advice. What you enter stays on this device until you share a file.")}</p>
     </div>
   );
 }

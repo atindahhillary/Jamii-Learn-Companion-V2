@@ -335,3 +335,32 @@ details { border-top: 1px solid var(--line); padding: 8px 0; } summary { cursor:
 .badge { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px; padding: 10px; border-radius: 14px; background: var(--bg); opacity: .6; }
 .badge[data-got=true] { opacity: 1; background: var(--butter); } .badge > span { font-size: 1.8rem; }
 @media (max-width: 860px) { .palette { grid-template-columns: repeat(2, minmax(0, 1fr)); } .paddocks { grid-template-columns: repeat(2, minmax(0, 1fr)); } .dtower { width: 140px; } }
+/* Impact dashboard and MEL tools */
+.tabs.sub { box-shadow: none; background: var(--lilac); } .tabs.sub [aria-selected=true] { background: var(--plum); }
+.dash-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+label.inline { display: inline-flex; gap: 8px; align-items: center; margin: 0; } label.inline select { width: auto; min-height: 38px; padding: 6px 10px; }
+.dash-bar .check { margin: 0; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.kpi-card { background: var(--card); border-radius: 16px; box-shadow: var(--shadow); padding: 14px; display: flex; flex-direction: column; gap: 6px; border-top: 4px solid var(--lilac); }
+.kpi-card > b { font-size: 1.5rem; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
+.kpi-card .row { align-items: center; gap: 8px; flex-wrap: nowrap; } .kpi-card small { font-weight: 600; line-height: 1.2; }
+.kpi-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: #fff; flex: none; }
+.up { color: #178a55; font-weight: 700; } .down { color: #b3261e; font-weight: 700; } .up .muted, .down .muted { font-weight: 400; }
+.spark { width: 80px; height: 30px; flex: none; }
+.dash-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.dash-grid .card { margin: 0; } .span2 { grid-column: span 2; }
+.insights { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: .9rem; }
+.insights li { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border-radius: 10px; background: #fdecea; } .insights li[data-good=true] { background: var(--lilac); }
+.goals { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.funnel { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.funnel li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 10px; border-radius: 8px; background: linear-gradient(90deg, #2f7d5b, #43a047); color: #fff; font-size: .8rem; min-width: 150px; }
+.net { display: flex; gap: 8px; align-items: center; padding: 10px 14px; border-radius: 12px; font-weight: 600; margin: 0; } .net.on { background: var(--lilac); color: var(--plum); } .net.off { background: var(--butter); color: #6f4f0c; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; margin-top: 12px; }
+textarea { width: 100%; padding: 10px 14px; border: 1.5px solid #cfd8c6; border-radius: 12px; font: inherit; margin-top: 5px; }
+.smart { display: inline-flex; gap: 3px; vertical-align: middle; } .smart i { font-style: normal; font-size: .72rem; font-weight: 800; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 5px; background: #fdecea; color: #b3261e; } .smart i[data-ok=true] { background: var(--lilac); color: var(--plum); }
+.stages { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.stages button { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--lilac); background: #fff; font-weight: 700; } .stages button[data-done=true] { background: var(--violet); color: #fff; border-color: var(--violet); }
+.brief { max-width: 760px; } .brief h3 { color: var(--plum); }
+@media (max-width: 1100px) { .dash-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 860px) { .dash-grid, .form-grid { grid-template-columns: minmax(0, 1fr); } .span2 { grid-column: auto; } .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpi-card > b { font-size: 1.2rem; } .spark { width: 56px; } }
+@media print { .no-print, .demo-bar { display: none !important; } .brief { box-shadow: none; max-width: none; } }

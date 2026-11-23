@@ -40,8 +40,8 @@ function Shell({ children }: { children: React.ReactNode }) {
   // The demo notice can be closed, which gives the chat more room on a phone.
   const [hideDemo, setHideDemo] = useState(() => { try { return localStorage.getItem("jlc-demo-bar") === "1"; } catch { return false; } });
   const nav = isAdmin
-    ? [["admin", BarChart3, L("Dashibodi", "Dashboard")], ["impact", Sprout, L("Athari", "Impact")], ["circles", Users, L("Makundi", "Circles")], ["chat", MessageCircle, L("Msaidizi", "Assistant")], ["profile", CircleUserRound, L("Wasifu", "Profile")]]
-    : [["home", Home, L("Nyumbani", "Home")], ["chat", MessageCircle, L("Msaidizi", "Assistant")], ["learn", BookOpen, L("Mafunzo", "Learn")], ["impact", Sprout, L("Athari", "Impact")], ["circles", Users, L("Makundi", "Circles")], ["tools", Wrench, L("Zana", "Tools")], ["profile", CircleUserRound, L("Wasifu", "Profile")]];
+    ? [["impact", Sprout, L("Athari", "Impact")], ["admin", BarChart3, L("Dashibodi", "Dashboard")], ["circles", Users, L("Makundi", "Circles")], ["chat", MessageCircle, L("Msaidizi", "Assistant")], ["profile", CircleUserRound, L("Wasifu", "Profile")]]
+    : [["impact", Sprout, L("Athari", "Impact")], ["home", Home, L("Nyumbani", "Home")], ["chat", MessageCircle, L("Msaidizi", "Assistant")], ["learn", BookOpen, L("Mafunzo", "Learn")], ["circles", Users, L("Makundi", "Circles")], ["tools", Wrench, L("Zana", "Tools")], ["profile", CircleUserRound, L("Wasifu", "Profile")]];
   const look = route === "chat" ? "plum" : isAdmin ? "vivid" : "soft";
   const top = route.split("/")[0];
   return (
@@ -84,6 +84,8 @@ function App() {
   const refresh = () => api<Me>("/me").then((m) => { setMe(m); setLangState(m.lang); }).catch(() => setMe(null));
   useEffect(() => { refresh(); }, []);
   // Once the app has run for a while, allow one more stale-file reload after the next deploy.
+  // Fetch the impact and data-collection pages early so the service worker keeps them for use with no signal.
+  useEffect(() => { const t = setTimeout(() => { if (navigator.onLine) { import("./impact").catch(() => undefined); import("./learn").catch(() => undefined); } }, 4000); return () => clearTimeout(t); }, []);
   useEffect(() => { const t = setTimeout(() => { try { sessionStorage.removeItem("jlc-reloaded"); } catch { /* fine */ } }, 15000); return () => clearTimeout(t); }, []);
   useEffect(() => { const f = () => setRoute(location.hash.slice(1)); addEventListener("hashchange", f); return () => removeEventListener("hashchange", f); }, []);
   useEffect(() => { document.documentElement.lang = lang; }, [lang]);
@@ -96,7 +98,7 @@ function App() {
   const value = { lang, setLang, me: me ?? null, refresh, go, route };
   if (me === undefined) return <Ctx.Provider value={value}><Loading /></Ctx.Provider>;
   if (!me) return <Ctx.Provider value={value}>{DEMO ? <DemoAuth /> : <Auth />}</Ctx.Provider>;
-  const r = route.split("/")[0] || (me.role === "admin" ? "admin" : "home");
+  const r = route.split("/")[0] || "impact"; // the impact dashboard is the first page after the landing page
   const page = r === "chat" ? <Chat /> : r === "learn" ? <Learn /> : r === "circles" ? <Circles /> : r === "tools" ? <Tools /> : r === "impact" ? <Impact /> : r === "profile" ? <Profile /> : r === "admin" && me.role === "admin" ? <Admin /> : <HomePage />;
   return <Ctx.Provider value={{ ...value, route: r }}><Shell>{page}</Shell></Ctx.Provider>;
 }
